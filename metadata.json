@@ -1,0 +1,6 @@
+{
+  "name": "AI Travel Planner",
+  "description": "An intelligent multi-agent travel planner that designs seamless, scalable itineraries incorporating flights, hotels, transit options, and real-time preferences.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
