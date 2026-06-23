@@ -68,10 +68,6 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
   const departFlight = flights.find(f => f.type === 'depart');
   const returnFlight = flights.find(f => f.type === 'return');
 
-  const sortedItinerary = [...itinerary].sort((a, b) => a.dayIndex - b.dayIndex);
-  const day1 = sortedItinerary[0];
-  const lastDay = sortedItinerary[sortedItinerary.length - 1];
-
   const parseTimeToMinutes = (timeStr: string): number => {
     if (!timeStr) return 0;
     const firstPart = timeStr.split("-")[0].trim().toLowerCase();
@@ -91,35 +87,48 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
     return hours * 60 + minutes;
   };
 
-  if (day1 && departFlight && departFlight.arrivalTime) {
-    const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
-      ? departFlight.arrivalTime.split("T")[1] 
-      : departFlight.arrivalTime;
-    
-    const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
-    if (arrivalMin > 0) {
-      day1.activities = day1.activities.filter((act: any) => {
-        if (act.type === "airport" || act.type === "checkin") return true;
-        const actMin = parseTimeToMinutes(act.time);
-        return actMin >= arrivalMin;
-      });
-    }
-  }
+  const sortedItinerary = [...itinerary].sort((a, b) => a.dayIndex - b.dayIndex);
 
-  if (lastDay && returnFlight && returnFlight.departureTime) {
-    const departureTimeStr = returnFlight.departureTime.includes("T") 
-      ? returnFlight.departureTime.split("T")[1] 
-      : returnFlight.departureTime;
-    
-    const departMin = parseTimeToMinutes(departureTimeStr);
-    if (departMin > 0) {
-      lastDay.activities = lastDay.activities.filter((act: any) => {
-        if (act.type === "airport") return true;
-        const actMin = parseTimeToMinutes(act.time);
-        return actMin <= departMin;
-      });
+  sortedItinerary.forEach((day: any) => {
+    const dayDateStrString = day.date; // e.g. "2026-06-18"
+    if (!dayDateStrString) return;
+
+    // 1. Depart Flight Arrival check on the matching date
+    if (departFlight && departFlight.arrivalTime) {
+      const flightArrivalDate = departFlight.arrivalTime.substring(0, 10); // "2026-06-18"
+      if (dayDateStrString === flightArrivalDate) {
+        const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
+          ? departFlight.arrivalTime.split("T")[1] 
+          : departFlight.arrivalTime;
+        const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
+        if (arrivalMin > 0) {
+          day.activities = day.activities.filter((act: any) => {
+            if (act.type === "airport" || act.type === "checkin" || act.title?.toLowerCase().includes("check-in") || act.title?.toLowerCase().includes("airport")) return true;
+            const actMin = parseTimeToMinutes(act.time);
+            return actMin >= arrivalMin;
+          });
+        }
+      }
     }
-  }
+
+    // 2. Return Flight Departure check on the matching date
+    if (returnFlight && returnFlight.departureTime) {
+      const flightReturnDate = returnFlight.departureTime.substring(0, 10); // "2026-06-25"
+      if (dayDateStrString === flightReturnDate) {
+        const departureTimeStr = returnFlight.departureTime.includes("T") 
+          ? returnFlight.departureTime.split("T")[1] 
+          : returnFlight.departureTime;
+        const departMin = parseTimeToMinutes(departureTimeStr);
+        if (departMin > 0) {
+          day.activities = day.activities.filter((act: any) => {
+            if (act.type === "airport" || act.title?.toLowerCase().includes("airport")) return true;
+            const actMin = parseTimeToMinutes(act.time);
+            return actMin <= departMin;
+          });
+        }
+      }
+    }
+  });
 
   return sortedItinerary;
 }
@@ -192,41 +201,61 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
       if (!actA.location || !actB.location) continue;
       if (actA.location.trim().toLowerCase() === actB.location.trim().toLowerCase()) continue;
 
+      // Do not auto-assign preferredTransportMode on initial generation so that the user gets to select of their own desire.
+
       let travelDurationMinutes = 15; // Default safety slot
       let distanceText = "Calculated commute";
       const preferredMode = actB.preferredTransportMode || "transit";
 
-      // Set dynamic fallback commute
-      if (preferredMode === "driving") {
-        travelDurationMinutes = 18;
-        distanceText = "4.2 km";
-        actB.transportation = {
-          mode: "Taxi / Car",
-          duration: "18 mins",
-          distance: "4.2 km",
-          cost: "¥1,800 - ¥2,900",
-          details: `Commute from "${actA.title}" to "${actB.title}" via taxi/car`
-        };
-      } else if (preferredMode === "walking") {
-        travelDurationMinutes = 12;
-        distanceText = "0.8 km";
-        actB.transportation = {
-          mode: "Walking",
-          duration: "12 mins",
-          distance: "0.8 km",
-          cost: "Free",
-          details: `Walk from "${actA.title}" to "${actB.title}"`
-        };
+      const modeLower = (actB.transportation?.mode || "").toLowerCase();
+      const matchesPreferred = 
+        (preferredMode === "walking" && (modeLower.includes("walk") || modeLower.includes("foot"))) ||
+        (preferredMode === "driving" && (modeLower.includes("driving") || modeLower.includes("taxi") || modeLower.includes("car") || modeLower.includes("uber") || modeLower.includes("grab"))) ||
+        (preferredMode === "transit" && (modeLower.includes("transit") || modeLower.includes("train") || modeLower.includes("metro") || modeLower.includes("subway") || modeLower.includes("bus")));
+
+      const useExistingTransportation = actB.transportation && actB.transportation.mode && actB.transportation.duration && (matchesPreferred || !actB.preferredTransportMode);
+
+      if (useExistingTransportation) {
+        const parsedDur = parseInt(actB.transportation.duration, 10);
+        if (!isNaN(parsedDur) && parsedDur > 0) {
+          travelDurationMinutes = parsedDur;
+        }
+        if (actB.transportation.distance) {
+          distanceText = actB.transportation.distance;
+        }
       } else {
-        travelDurationMinutes = 25;
-        distanceText = "3.5 km";
-        actB.transportation = {
-          mode: "Public Transit",
-          duration: "25 mins",
-          distance: "3.5 km",
-          cost: "¥220",
-          details: `Subway/bus commute from "${actA.title}" to "${actB.title}"`
-        };
+        // Set dynamic fallback commute
+        if (preferredMode === "driving") {
+          travelDurationMinutes = 18;
+          distanceText = "4.2 km";
+          actB.transportation = {
+            mode: "Taxi / Car",
+            duration: "18 mins",
+            distance: "4.2 km",
+            cost: "¥1,800 - ¥2,900",
+            details: `Commute from "${actA.title}" to "${actB.title}" via taxi/car`
+          };
+        } else if (preferredMode === "walking") {
+          travelDurationMinutes = 12;
+          distanceText = "0.8 km";
+          actB.transportation = {
+            mode: "Walking",
+            duration: "12 mins",
+            distance: "0.8 km",
+            cost: "Free",
+            details: `Walk from "${actA.title}" to "${actB.title}"`
+          };
+        } else {
+          travelDurationMinutes = 25;
+          distanceText = "3.5 km";
+          actB.transportation = {
+            mode: "Public Transit",
+            duration: "25 mins",
+            distance: "3.5 km",
+            cost: "¥220",
+            details: `Subway/bus commute from "${actA.title}" to "${actB.title}"`
+          };
+        }
       }
 
       if (hasMapsKey) {
@@ -387,12 +416,51 @@ ${feedbackText}
 ${userInstructionsText}
 ${existingItineraryText}
 
-### Instructions for Generating the Plan
+### Instructions for Generating the Plan:
 - CRITICAL FLIGHT & HOTEL BOUNDARIES RULE: The generated schedule must ALWAYS strictly adhere to flight bookings. 
-  - Day 1 activities MUST NOT start before flight arrival time. If an outbound flight arrives at 4:30 PM, only plan evening dinner/relaxation nearby starting from ~6:00 PM. No morning/afternoon activities should be scheduled on Day 1.
-  - The final day activities MUST finish in time for departure check-in. If the return flight leaves at 2:00 PM, only schedule a quick breakfast/morning checkout near the hotel/airport, and wrap up all activities by 10:30 AM/11:00 AM.
+  - FIRST GENERATED ITINERARY STRICT INTEGRITY (STRICT NO-POST-RETURN-FLIGHT-ACTIVITIES RULE): Under no circumstances should you generate any activities, hotel check-ins, check-outs, dinners, or routes after the user's final return flight has departed or landed back in their homecountry. If the return flight is on a Day X, that return flight landing must be the absolute final item in the schedule for that day and trip. DO NOT suggest "explore neighborhood" or "dinner at restaurant" or check-ins on the night of returning home.
+  - MIDNIGHT / EARLY MORNING RETURN FLIGHTS: If the return flight departure is in the high midnight or early morning hours (e.g. between 12:00 AM midnight and 05:00 AM) of Day X:
+    - You MUST treat Day X as having NO daytime activities (no lunches, afternoon tours, or 11:00 AM hotel checkouts), because the flight departs during the very first hours of that date!
+    - The "Hotel Check-out" and "Transit/Commute to Airport" activities MUST be scheduled on the PREVIOUS day's evening/night (Day X-1) e.g., around 10:00 PM or 11:00 PM, so that the traveler arrives at the airport in time for their flight!
+    - On Day X itself, only output the flight activity itself at the flight time, or keep Day X activities completely empty after the early departure so that no travel boundaries are ever violated!
+  - CRITICAL MULTI-HOTEL LOGICAL TRANSITIONS AND STAY BASES:
+    - You must carefully analyze the check-in and check-out dates of each booked hotel! (For example, if Osaka hotel is booked on "2026-07-04" to "2026-07-09" and Tokyo hotel is booked on "2026-07-05" to "2026-07-06").
+    - Under NO circumstances can a traveler be scheduled to stay overnight or spend late evening in a city if they have no active hotel booking there for that night! They CANNOT remain or be active in a city like Tokyo after checking out at 11:00 AM on "2026-07-06" if they do not have a hotel booked in Tokyo for the night of "2026-07-06". They must live where their active hotel booking is!
+    - At all times, track the "currently active home/hotel base" per date. If the traveler checks out of a nested stay (like Tokyo hotel check-out on "2026-07-06" at 11:00 AM) while they still have a broader active booking elsewhere (like Osaka hotel booked from "2026-07-04" to "2026-07-09"), they MUST immediately travel back. You MUST schedule checkout, followed by transit (e.g. bullet train back to Osaka) on the checkout date itself (e.g., "2026-07-06" around noon), and then plan all subsequent activities on that day in the remaining active hotel city (Osaka)! No Tokyo activities are allowed after checkout unless transitioning!
+    - Conversely, if they are transitioning from Osaka to Tokyo on "2026-07-05", you must include the transit to Tokyo, and then check-in at the Tokyo hotel starting at ~03:00 PM (15:00).
+  - MANDATORY HOTEL CHECK-IN & CHECK-OUT SLOTS and STRICT HOTEL-TO-HOTEL TRANSITIONS:
+    - For every hotel details listed in the trip:
+      - You MUST explicitly include a "Hotel Check-in: [Hotel Name]" activity slot in the schedule on the check-in date (usually at ~03:00 PM or 15:00) with a title like "Hotel Check-in: [Hotel Name]".
+      - You MUST explicitly include a "Hotel Check-out: [Hotel Name]" activity slot in the schedule on the check-out date (typically at ~11:00 AM, OR on the evening of the previous day if there is a midnight flight as described above!) with a title like "Hotel Check-out: [Hotel Name]".
+    - STRICT HOTEL-TO-HOTEL PROCESS TRANSITION RULE: Under no circumstances can you suggest checking out of Hotel A and immediately checking in to Hotel B in the block sequentially. You MUST always include an intermediate process of transportation, commute, or transit to the city travel/station between them. For example:
+      1. "Hotel Check-out: [Hotel Name A]"
+      2. "Commute & Transit to Station/Airport" (e.g., transit route via Tokaido Shinkansen or local subway station)
+      3. "Commute & Travel to New Destination Base"
+      4. "Hotel Check-in: [Hotel Name B]"
+  - MANDATORY FLIGHT ARRIVAL & AIRPORT RETURN TRANSITION SLOTS:
+    - For every depart or outbound flight in the trip:
+      - You MUST explicitly schedule a "Flight Landing & Arrival at [Airport name/code]" activity slot in the Day-by-Day schedule, at the exact arrival time of that flight.
+      - You MUST explicitly schedule a "Commute & Return to [Airport name/code] for Departure" activity slot in the Day-by-Day schedule, starting exactly 2-3 hours before the flight departure time.
+    - For multi-stop route transitions or flight transitions between countries/cities:
+      - You MUST strictly generate and link these events sequentially as separate Activities on their respective dates and times:
+        1. "Hotel Check-out: [Hotel Name]" (e.g. in Singapore)
+        2. "Commute to [Airport Code]" (to travel to the airport in that country)
+        3. "Arrival at Airport, Flight Boarding & Flight Departure (Singapore to Manila)" (explicitly represent the airport flight departure)
+        4. "Flight Landing & Arrival at [Next Airport Code]" (flight landing in the next country/destination)
+        5. "Commute from Airport to City / [New Hotel Name]" (airport to city travel)
+        6. "Hotel Check-in: [New Hotel Name]" (at the new hotel, stating times clearly)
+      Be extremely detailed and specific, stating check-in/out times of every single hotel and commute times to and from airports for every flight transition.
   - No activities may ever be planned during flight times themselves. No attractions should be scheduled on the night after the departure flight has already left.
   - Hotel check-in/check-out dates and locations should be honored as starting/ending bases or active accommodations.
+- STRICT SPECIFIC NOT-DUPLICATED DAY-BY-DAY SCHEDULES (VARIETY RULE):
+  - Every day in the itinerary MUST have a completely different theme, set of activities, places to eat, and explore. Do NOT output duplicate or identical schedules/places on different days.
+- STRICT ACTIVE HOTEL BASE NEIGHBORHOOD CLUSTERING:
+  - You must always structure a day's recommended places strictly based on where the user is checked in for that day! Recommended restaurants and attractions must not be "too far away" from the checked-in hotel for that date (generally within a tight neighborhood cluster of 2-5 km, unless a specific day excursion is explicitly planned).
+  - In your daily activities, explicitly state the current active checked-in hotel in the description and details to justify the proximity (e.g., "Conveniently located near your accommodation, [Hotel Name], only a 12-minute walk...").
+  - If the user checkouts and moves to a different hotel, you MUST immediately shift the geographic frame of recommendations to be clustered near the *new* hotel and its surrounding area.
+- STRICT DESTINATION LOCAL CURRENCY AND PRICING INTEGRITY:
+  - For all ticket prices, budgets, food cost, and transportation costs parameters, you MUST output numbers and symbols in the actual local currency of the specific day's active country/destination (e.g., use '¥' and realistic Japanese Yen numbers for Japan, '₩' and realistic Korean Won numbers for South Korea, 'RM' and realistic Ringgit numbers for Malaysia).
+  - Double check every numeric value to ensure it matches realistic price scales in that local currency (e.g., do NOT generate Taxi RM32,227 for a 22 mins ride! That ride should represent local currency value, e.g. RM25 to RM45, or JPY 3,000 to 5,000, or KRW 15,000 to 25,000 depending on destination). Ensure absolute mathematical realism for each currency.
 - REFINEMENT & PRESERVATION POLICY:
   - If a CURRENT ACTIVE ITINERARY is provided above, you MUST preserve all existing activity structures, days, dates, IDs, titles, descriptions, and sequence layout. Do NOT shuffle or scramble them.
   - Only insert what is requested (such as "add a museum in Tokyo Day 2") into the correct day list, while returning all other unmodified days and activities exactly identical.
@@ -1036,6 +1104,14 @@ app.post("/api/validate-itinerary", async (req, res) => {
     if (!actA.location || !actB.location) continue;
     if (actA.location.trim().toLowerCase() === actB.location.trim().toLowerCase()) continue;
 
+    // Skip feasibility warning if previous activity was a flight/airport arrival,
+    // as that indicates an inter-city transition and they did not commute on ground
+    const isFlightA = actA.type === "airport" || 
+                      (actA.title || "").toLowerCase().includes("flight") || 
+                      (actA.location || "").toLowerCase().includes("airport") ||
+                      (actA.description || "").toLowerCase().includes("flight");
+    if (isFlightA) continue;
+
     const timesA = parseActivityTimes(actA.time);
     const timesB = parseActivityTimes(actB.time);
 
@@ -1158,7 +1234,20 @@ app.post("/api/validate-itinerary", async (req, res) => {
 
       const parsed = JSON.parse(response.text);
       if (parsed && parsed.warnings) {
-        return res.json({ warnings: parsed.warnings });
+        const filtered = parsed.warnings.filter((w: any) => {
+          const pair = pairsToCheck.find(p => p.actA.id === w.prevActivityId && p.actB.id === w.curActivityId);
+          if (pair) {
+            if (w.isImpossible) return true;
+            if (pair.mode === "walking") return true;
+
+            const msg = (w.message || "").toLowerCase();
+            if (msg.includes("walk instead") || msg.includes("walking is faster")) {
+              return false;
+            }
+          }
+          return true;
+        });
+        return res.json({ warnings: filtered });
       }
     } catch (err) {
       console.error("Gemini validate-itinerary error:", err);

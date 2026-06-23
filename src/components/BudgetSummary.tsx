@@ -17,7 +17,20 @@ const USD_RATES: Record<string, number> = {
   KRW: 1380.0,
   THB: 36.7,
   IDR: 16400.0,
-  INR: 83.5
+  INR: 83.5,
+  PHP: 58.5,
+  HKD: 7.8,
+  TWD: 32.4,
+  NZD: 1.63,
+  CHF: 0.89,
+  AED: 3.67,
+  SAR: 3.75,
+  ZAR: 18.2,
+  NGN: 1450.0,
+  KES: 130.0,
+  EGP: 47.5,
+  MAD: 10.0,
+  GHS: 14.8
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -33,10 +46,83 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   KRW: "₩",
   THB: "฿",
   IDR: "Rp",
-  INR: "₹"
+  INR: "₹",
+  PHP: "₱",
+  HKD: "HK$",
+  TWD: "NT$",
+  NZD: "NZ$",
+  CHF: "CHF",
+  AED: "AED",
+  SAR: "SR",
+  ZAR: "R",
+  NGN: "₦",
+  KES: "KSh",
+  EGP: "E£",
+  MAD: "DH",
+  GHS: "GH₵"
 };
 
-const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR"];
+const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR", "PHP", "HKD", "TWD", "NZD", "CHF", "AED", "SAR", "ZAR", "NGN", "KES", "EGP", "MAD", "GHS"];
+
+const mapCountryToCurrency = (country: string): string => {
+  const norm = (country || "").toLowerCase().trim();
+  if (!norm) return "USD";
+  
+  const mapping: Record<string, string> = {
+    "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
+    "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
+    "malaysia": "MYR", "my": "MYR", "mys": "MYR",
+    "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY", "kyoto": "JPY", "osaka": "JPY",
+    "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
+    "australia": "AUD", "au": "AUD", "aus": "AUD", "sydney": "AUD", "melbourne": "AUD",
+    "canada": "CAD", "ca": "CAD", "can": "CAD", "toronto": "CAD", "vancouver": "CAD",
+    "china": "CNY", "cn": "CNY", "beijing": "CNY", "shanghai": "CNY",
+    "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
+    "thailand": "THB", "th": "THB", "bangkok": "THB", "phuket": "THB",
+    "indonesia": "IDR", "id": "IDR", "jakarta": "IDR", "bali": "IDR",
+    "india": "INR", "in": "INR", "delhi": "INR", "mumbai": "INR",
+    "philippines": "PHP", "philippine": "PHP", "philipines": "PHP", "philiplhine": "PHP", "phlippines": "PHP", "ph": "PHP", "manila": "PHP",
+    "hong kong": "HKD", "hk": "HKD", "hkg": "HKD",
+    "taiwan": "TWD", "tw": "TWD", "taipei": "TWD",
+    "new zealand": "NZD", "nz": "NZD", "auckland": "NZD",
+    "switzerland": "CHF", "ch": "CHF", "swiss": "CHF", "zurich": "CHF",
+    "united arab emirates": "AED", "uae": "AED", "dubai": "AED", "abu dhabi": "AED",
+    "saudi arabia": "SAR", "sa": "SAR", "riyadh": "SAR",
+    "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
+    "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
+    "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
+    "kenya": "KES", "ke": "KES", "nairobi": "KES",
+    "morocco": "MAD", "ma": "MAD", "casablanca": "MAD", "marrakech": "MAD",
+    "ghana": "GHS", "gh": "GHS", "accra": "GHS",
+    "germany": "EUR", "france": "EUR", "italy": "EUR", "spain": "EUR", 
+    "netherlands": "EUR", "belgium": "EUR", "austria": "EUR", "greece": "EUR", 
+    "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "paris": "EUR", "rome": "EUR"
+  };
+
+  if (mapping[norm]) return mapping[norm];
+
+  const words = norm.split(/[\s,./()|-]+/);
+  const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (key.includes(" ")) {
+      if (norm.includes(key)) return mapping[key];
+    } else if (words.includes(key)) {
+      return mapping[key];
+    }
+  }
+
+  if (norm.includes("phil") || norm.includes("phli") || norm.includes("manila") || norm.includes("philipp")) {
+    return "PHP";
+  }
+  if (norm.includes("sing") || norm.includes("merlion")) {
+    return "SGD";
+  }
+  if (norm.includes("tokyo") || norm.includes("japan") || norm.includes("nrt") || norm.includes("hnd")) {
+    return "JPY";
+  }
+
+  return "USD";
+};
 
 const convertAmount = (amount: number, from: string, to: string): number => {
   const cleanFrom = (from || "USD").toUpperCase();
@@ -55,6 +141,13 @@ interface BudgetSummaryProps {
 export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps) {
   const baseCurrency = trip.budgetStats?.currency || "USD";
   const displayCurrency = trip.displayCurrency || baseCurrency;
+
+  const homeCurr = mapCountryToCurrency(trip.homeCountry || "");
+  const travelCurrs = Array.from(new Set([
+    mapCountryToCurrency(trip.destinationName),
+    ...(trip.destinations || []).map(d => mapCountryToCurrency(d))
+  ])).filter(c => c !== homeCurr);
+  const remainingCurrs = AVAILABLE_CURRENCIES.filter(c => c !== homeCurr && !travelCurrs.includes(c));
 
   const aspectBudgets = trip.aspectBudgets || {
     flights: 0,
@@ -235,11 +328,27 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
             }}
             className="bg-slate-800 border border-slate-700 text-white text-xs font-bold font-mono py-2 px-3 rounded-xl focus:border-indigo-500 outline-none cursor-pointer"
           >
-            {AVAILABLE_CURRENCIES.map(curr => (
-              <option key={curr} value={curr}>
-                {curr} ({CURRENCY_SYMBOLS[curr] || "$"})
+            <optgroup label="🏡 Home Country Currency">
+              <option value={homeCurr}>
+                {homeCurr} ({CURRENCY_SYMBOLS[homeCurr] || "$"}) - Home
               </option>
-            ))}
+            </optgroup>
+            {travelCurrs.length > 0 && (
+              <optgroup label="✈️ Travel Destination Currency">
+                {travelCurrs.map(curr => (
+                  <option key={curr} value={curr}>
+                    {curr} ({CURRENCY_SYMBOLS[curr] || "$"}) - Destination
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="🌐 All Other Currencies">
+              {remainingCurrs.map(curr => (
+                <option key={curr} value={curr}>
+                  {curr} ({CURRENCY_SYMBOLS[curr] || "$"})
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
       </div>

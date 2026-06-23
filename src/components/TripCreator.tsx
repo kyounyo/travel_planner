@@ -11,12 +11,377 @@ interface TripCreatorProps {
   isLoading: boolean;
 }
 
+const POPULAR_COUNTRIES = [
+  { name: "South Africa", currency: "ZAR", flag: "🇿🇦" },
+  { name: "Singapore", currency: "SGD", flag: "🇸🇬" },
+  { name: "Malaysia", currency: "MYR", flag: "🇲🇾" },
+  { name: "Nigeria", currency: "NGN", flag: "🇳🇬" },
+  { name: "United States", currency: "USD", flag: "🇺🇸" },
+  { name: "Japan", currency: "JPY", flag: "🇯🇵" },
+  { name: "United Kingdom", currency: "GBP", flag: "🇬🇧" },
+  { name: "Egypt", currency: "EGP", flag: "🇪🇬" },
+  { name: "Kenya", currency: "KES", flag: "🇰🇪" },
+  { name: "Australia", currency: "AUD", flag: "🇦🇺" },
+  { name: "Canada", currency: "CAD", flag: "🇨🇦" },
+  { name: "China", currency: "CNY", flag: "🇨🇳" },
+  { name: "South Korea", currency: "KRW", flag: "🇰🇷" },
+  { name: "Thailand", currency: "THB", flag: "🇹🇭" },
+  { name: "Indonesia", currency: "IDR", flag: "🇮🇩" },
+  { name: "India", currency: "INR", flag: "🇮🇳" },
+  { name: "Philippines", currency: "PHP", flag: "🇵🇭" },
+  { name: "Hong Kong", currency: "HKD", flag: "🇭🇰" },
+  { name: "Taiwan", currency: "TWD", flag: "🇹🇼" },
+  { name: "New Zealand", currency: "NZD", flag: "🇳🇿" },
+  { name: "Morocco", currency: "MAD", flag: "🇲🇦" },
+  { name: "Ghana", currency: "GHS", flag: "🇬🇭" },
+  { name: "Switzerland", currency: "CHF", flag: "🇨🇭" },
+  { name: "Germany", currency: "EUR", flag: "🇩🇪" },
+  { name: "France", currency: "EUR", flag: "🇫🇷" },
+  { name: "Italy", currency: "EUR", flag: "🇮🇹" },
+  { name: "Spain", currency: "EUR", flag: "🇪🇸" },
+  { name: "United Arab Emirates", currency: "AED", flag: "🇦🇪" },
+  { name: "Saudi Arabia", currency: "SAR", flag: "🇸🇦" }
+];
+
+const AIRPORT_MAP: Record<string, { code: string, name: string }[]> = {
+  "south africa": [
+    { code: "CPT", name: "Cape Town International Airport" },
+    { code: "JNB", name: "O.R. Tambo International Airport, Johannesburg" }
+  ],
+  "johannesburg": [{ code: "JNB", name: "O.R. Tambo International Airport" }],
+  "cape town": [{ code: "CPT", name: "Cape Town International Airport" }],
+  "singapore": [{ code: "SIN", name: "Singapore Changi Airport" }],
+  "malaysia": [
+    { code: "KUL", name: "Kuala Lumpur International Airport" },
+    { code: "BKI", name: "Kota Kinabalu International Airport" }
+  ],
+  "kuala lumpur": [{ code: "KUL", name: "Kuala Lumpur International Airport" }],
+  "nigeria": [
+    { code: "LOS", name: "Murtala Muhammed International Airport, Lagos" },
+    { code: "ABV", name: "Nnamdi Azikiwe International Airport, Abuja" }
+  ],
+  "lagos": [{ code: "LOS", name: "Murtala Muhammed International Airport" }],
+  "abuja": [{ code: "ABV", name: "Nnamdi Azikiwe International Airport" }],
+  "united states": [
+    { code: "JFK", name: "John F. Kennedy International Airport, New York" },
+    { code: "LAX", name: "Los Angeles International Airport" },
+    { code: "SFO", name: "San Francisco International Airport" },
+    { code: "ORD", name: "O'Hare International Airport, Chicago" }
+  ],
+  "los angeles": [{ code: "LAX", name: "Los Angeles International Airport" }],
+  "san francisco": [{ code: "SFO", name: "San Francisco International Airport" }],
+  "new york": [
+    { code: "JFK", name: "John F. Kennedy International Airport" },
+    { code: "LGA", name: "LaGuardia Airport" },
+    { code: "EWR", name: "Newark Liberty International Airport" }
+  ],
+  "japan": [
+    { code: "NRT", name: "Tokyo Narita International Airport" },
+    { code: "HND", name: "Tokyo Haneda Airport" },
+    { code: "KIX", name: "Osaka Kansai International Airport" }
+  ],
+  "tokyo": [
+    { code: "NRT", name: "Tokyo Narita International Airport" },
+    { code: "HND", name: "Tokyo Haneda Airport" }
+  ],
+  "osaka": [{ code: "KIX", name: "Osaka Kansai International Airport" }],
+  "united kingdom": [
+    { code: "LHR", name: "London Heathrow Airport" },
+    { code: "LGW", name: "London Gatwick Airport" },
+    { code: "MAN", name: "Manchester Airport" }
+  ],
+  "london": [
+    { code: "LHR", name: "London Heathrow Airport" },
+    { code: "LGW", name: "London Gatwick Airport" }
+  ],
+  "egypt": [
+    { code: "CAI", name: "Cairo International Airport" },
+    { code: "HRG", name: "Hurghada International Airport" }
+  ],
+  "cairo": [{ code: "CAI", name: "Cairo International Airport" }],
+  "kenya": [
+    { code: "NBO", name: "Jomo Kenyatta International Airport, Nairobi" },
+    { code: "MBA", name: "Moi International Airport, Mombasa" }
+  ],
+  "nairobi": [{ code: "NBO", name: "Jomo Kenyatta International Airport" }],
+  "australia": [
+    { code: "SYD", name: "Sydney Kingsford Smith Airport" },
+    { code: "MEL", name: "Melbourne Airport" },
+    { code: "BNE", name: "Brisbane Airport" }
+  ],
+  "sydney": [{ code: "SYD", name: "Sydney Kingsford Smith Airport" }],
+  "melbourne": [{ code: "MEL", name: "Melbourne Airport" }],
+  "brisbane": [{ code: "BNE", name: "Brisbane Airport" }],
+  "canada": [
+    { code: "YYZ", name: "Toronto Pearson International Airport" },
+    { code: "YVR", name: "Vancouver International Airport" }
+  ],
+  "toronto": [{ code: "YYZ", name: "Toronto Pearson International Airport" }],
+  "vancouver": [{ code: "YVR", name: "Vancouver International Airport" }],
+  "china": [
+    { code: "PEK", name: "Beijing Capital International Airport" },
+    { code: "PVG", name: "Shanghai Pudong International Airport" },
+    { code: "CAN", name: "Guangzhou Baiyun International Airport" }
+  ],
+  "beijing": [{ code: "PEK", name: "Beijing Capital International Airport" }],
+  "shanghai": [{ code: "PVG", name: "Shanghai Pudong International Airport" }],
+  "south korea": [
+    { code: "ICN", name: "Seoul Incheon International Airport" },
+    { code: "GMP", name: "Seoul Gimpo International Airport" }
+  ],
+  "seoul": [
+    { code: "ICN", name: "Seoul Incheon International Airport" },
+    { code: "GMP", name: "Seoul Gimpo International Airport" }
+  ],
+  "thailand": [
+    { code: "BKK", name: "Bangkok Suvarnabhumi Airport" },
+    { code: "DMK", name: "Bangkok Don Mueang International" },
+    { code: "HKT", name: "Phuket International Airport" }
+  ],
+  "bangkok": [
+    { code: "BKK", name: "Bangkok Suvarnabhumi Airport" },
+    { code: "DMK", name: "Bangkok Don Mueang International" }
+  ],
+  "phuket": [{ code: "HKT", name: "Phuket International Airport" }],
+  "indonesia": [
+    { code: "CGK", name: "Jakarta Soekarno-Hatta International Airport" },
+    { code: "DPS", name: "Bali Ngurah Rai International Airport" }
+  ],
+  "jakarta": [{ code: "CGK", name: "Jakarta Soekarno-Hatta International Airport" }],
+  "bali": [{ code: "DPS", name: "Bali Ngurah Rai International Airport" }],
+  "denpasar": [{ code: "DPS", name: "Bali Ngurah Rai International Airport" }],
+  "india": [
+    { code: "DEL", name: "Delhi Indira Gandhi International Airport" },
+    { code: "BOM", name: "Mumbai Chhatrapati Shivaji Airport" }
+  ],
+  "delhi": [{ code: "DEL", name: "Delhi Indira Gandhi International Airport" }],
+  "mumbai": [{ code: "BOM", name: "Mumbai Chhatrapati Shivaji Airport" }],
+  "philippines": [
+    { code: "MNL", name: "Manila Ninoy Aquino International Airport" },
+    { code: "CEB", name: "Cebu Mactan International Airport" }
+  ],
+  "manila": [{ code: "MNL", name: "Manila Ninoy Aquino International Airport" }],
+  "hong kong": [{ code: "HKG", name: "Hong Kong International Airport" }],
+  "taiwan": [{ code: "TPE", name: "Taiwan Taoyuan International Airport" }],
+  "taipei": [{ code: "TPE", name: "Taiwan Taoyuan International Airport" }],
+  "new zealand": [
+    { code: "AKL", name: "Auckland Airport" },
+    { code: "CHC", name: "Christchurch International Airport" }
+  ],
+  "auckland": [{ code: "AKL", name: "Auckland Airport" }],
+  "morocco": [
+    { code: "CMN", name: "Mohammed V International Airport, Casablanca" },
+    { code: "RAK", name: "Marrakesh Menara Airport" }
+  ],
+  "casablanca": [{ code: "CMN", name: "Mohammed V International Airport" }],
+  "marrakesh": [{ code: "RAK", name: "Marrakesh Menara Airport" }],
+  "ghana": [{ code: "ACC", name: "Kotoka International Airport, Accra" }],
+  "accra": [{ code: "ACC", name: "Kotoka International Airport" }],
+  "switzerland": [
+    { code: "ZRH", name: "Zurich Airport" },
+    { code: "GVA", name: "Geneva Airport" }
+  ],
+  "zurich": [{ code: "ZRH", name: "Zurich Airport" }],
+  "germany": [
+    { code: "FRA", name: "Frankfurt Airport" },
+    { code: "MUC", name: "Munich Airport" }
+  ],
+  "frankfurt": [{ code: "FRA", name: "Frankfurt Airport" }],
+  "munich": [{ code: "MUC", name: "Munich Airport" }],
+  "france": [
+    { code: "CDG", name: "Paris Charles de Gaulle Airport" },
+    { code: "ORY", name: "Paris Orly Airport" }
+  ],
+  "paris": [
+    { code: "CDG", name: "Paris Charles de Gaulle Airport" },
+    { code: "ORY", name: "Paris Orly Airport" }
+  ],
+  "italy": [
+    { code: "FCO", name: "Rome Fiumicino Airport" },
+    { code: "MXP", name: "Milan Malpensa Airport" }
+  ],
+  "rome": [{ code: "FCO", name: "Rome Fiumicino Airport" }],
+  "spain": [
+    { code: "MAD", name: "Madrid-Barajas Airport" },
+    { code: "BCN", name: "Barcelona-El Prat Airport" }
+  ],
+  "madrid": [{ code: "MAD", name: "Madrid-Barajas Airport" }],
+  "barcelona": [{ code: "BCN", name: "Barcelona-El Prat Airport" }],
+  "united arab emirates": [
+    { code: "DXB", name: "Dubai International Airport" },
+    { code: "AUH", name: "Abu Dhabi International Airport" }
+  ],
+  "dubai": [{ code: "DXB", name: "Dubai International Airport" }],
+  "abu dhabi": [{ code: "AUH", name: "Abu Dhabi International Airport" }],
+  "saudi arabia": [
+    { code: "RUH", name: "King Khalid International Airport, Riyadh" },
+    { code: "JED", name: "King Abdulaziz International Airport, Jeddah" }
+  ],
+  "riyadh": [{ code: "RUH", name: "King Khalid International Airport" }],
+  "jeddah": [{ code: "JED", name: "King Abdulaziz International Airport" }],
+  "vietnam": [
+    { code: "HAN", name: "Noi Bai International Airport, Hanoi" },
+    { code: "SGN", name: "Tan Son Nhat International Airport, Ho Chi Minh" }
+  ],
+  "hanoi": [{ code: "HAN", name: "Noi Bai International Airport" }],
+  "ho chi minh": [{ code: "SGN", name: "Tan Son Nhat International Airport" }],
+  "maldives": [{ code: "MLE", name: "Velana International Airport, Male" }],
+  "male": [{ code: "MLE", name: "Velana International Airport, Male" }],
+  "netherlands": [{ code: "AMS", name: "Amsterdam Airport Schiphol" }],
+  "amsterdam": [{ code: "AMS", name: "Amsterdam Airport Schiphol" }]
+};
+
+const getTodayString = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+interface MustGoPlace {
+  name: string;
+  description: string;
+}
+
+const MUST_GO_DICT: Record<string, MustGoPlace[]> = {
+  tokyo: [
+    { name: "Shibuya Crossing", description: "The world's busiest pedestrian intersection, vibrant, neon-lit, and iconic." },
+    { name: "Senso-ji Temple", description: "Tokyo's oldest and most iconic ancient Buddhist temple located in historical Asakusa." },
+    { name: "Tokyo Skytree", description: "The tallest tower in Japan, presenting majestic 360-degree views of Tokyo." },
+    { name: "Meiji Shrine", description: "A tranquil sanctuary set inside a magnificent forested park near Shibuya." },
+    { name: "teamLab Planets", description: "A critically-acclaimed digital museum of interactive sensory light art installations." }
+  ],
+  kyoto: [
+    { name: "Fushimi Inari Taisha", description: "Mountaintop shrine famous for its stunning path of thousands of scarlet torii gates." },
+    { name: "Kinkaku-ji", description: "Kyoto's legendary Golden Pavilion, a Zen temple with the top two floors plated in gold leaf." },
+    { name: "Arashiyama Bamboo Grove", description: "A dreamy pathway walking through towering, rustling emerald green stalks." },
+    { name: "Gion District", description: "A beautifully preserved traditional entertainment district known for geisha heritage." }
+  ],
+  osaka: [
+    { name: "Osaka Castle", description: "A historic 16th-century fortress and museum surrounded by thousands of cherry tree gardens." },
+    { name: "Dotonbori", description: "Osaka's electric food street hub famous for spectacular billboards and street food." },
+    { name: "Universal Studios Japan", description: "A world-renowned movie theme park featuring Super Nintendo World and Harry Potter." }
+  ],
+  manila: [
+    { name: "Intramuros", description: "Historical walled Spanish enclave featuring Fort Santiago and colonial architecture." },
+    { name: "Rizal Park", description: "An expansive evergreen national park dedicated to national hero Jose Rizal." },
+    { name: "San Agustin Church", description: "The oldest stone baroque church in the Philippines, a UNESCO World Heritage site." },
+    { name: "National Museum of Fine Arts", description: "Stunning galleries hosting historic Filipino masterpieces including Juan Luna's Spoliarium." }
+  ],
+  philippines: [
+    { name: "Intramuros", description: "Spanish-era historic fortress city and cobblestone streets in Manila." },
+    { name: "Rizal Park", description: "The iconic national park framing the history and heart of Manila." },
+    { name: "San Agustin Church", description: "A historical UNESCO stone church boasting intricate, detailed baroque interiors." }
+  ],
+  singapore: [
+    { name: "Gardens by the Bay", description: "An award-winning biodome featuring majestic Supertrees and a towering indoor waterfall." },
+    { name: "Marina Bay Sands SkyPark", description: "The legendary architectural icon offering a suspended 360-degree sky deck overview." },
+    { name: "Changi Jewel", description: "The incredible 40-meter tall indoor Rain Vortex fountain enveloped by lush botanical trails." }
+  ],
+  seoul: [
+    { name: "Gyeongbokgung Palace", description: "The grandest main royal palace of the Joseon Dynasty, featuring the royal guard change walk." },
+    { name: "N Seoul Tower", description: "A spectacular panoramic peak observatory on Mount Namsan, iconic for couples." },
+    { name: "Bukchon Hanok Village", description: "A picturesque authentic village filled with hundred-year-old traditional Korean houses." }
+  ],
+  paris: [
+    { name: "Eiffel Tower", description: "The legendary wrought-iron tower commanding Paris's scenic skyline." },
+    { name: "Louvre Museum", description: "The world's grandest art capital, housing Leonardo da Vinci's Mona Lisa." },
+    { name: "Arc de Triomphe", description: "An iconic monumental triumphal arch at the pinnacle of the elegant Champs-Élysées." }
+  ],
+  london: [
+    { name: "British Museum", description: "World-famous museum showcasing millions of historical cultural artifacts from humanity." },
+    { name: "London Eye", description: "The massive riverside landmark observation wheel with views over Big Ben." },
+    { name: "Tower of London", description: "The medieval royal fortress holding a pristine array of royal crown jewels." }
+  ],
+  newyork: [
+    { name: "Statue of Liberty", description: "The monumental colossal neoclassical sculpture representing freedom in New York Harbor." },
+    { name: "Central Park", description: "An incredible 843-acre lush green park oasis within the core of Manhattan." },
+    { name: "Times Square", description: "The stunningly lit, high-energy Broadway theater crossroad of Midtown." }
+  ],
+  rome: [
+    { name: "Colosseum", description: "The massive historic Flavian amphitheater holding legends of gladiators." },
+    { name: "Trevi Fountain", description: "An incredible 17th-century masterpiece of baroque water-sculpture design." },
+    { name: "Vatican Museums", description: "The high assembly of galleries holding the gorgeous Sistine Chapel by Michelangelo." }
+  ]
+};
+
+const getFutureDateString = (daysAhead: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const mapCountryToCurrency = (country: string): string => {
+  const norm = (country || "").toLowerCase().trim();
+  if (!norm) return "USD";
+  
+  const mapping: Record<string, string> = {
+    "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
+    "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
+    "malaysia": "MYR", "my": "MYR", "mys": "MYR",
+    "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY", "kyoto": "JPY", "osaka": "JPY",
+    "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
+    "australia": "AUD", "au": "AUD", "aus": "AUD", "sydney": "AUD", "melbourne": "AUD",
+    "canada": "CAD", "ca": "CAD", "can": "CAD", "toronto": "CAD", "vancouver": "CAD",
+    "china": "CNY", "cn": "CNY", "beijing": "CNY", "shanghai": "CNY",
+    "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
+    "thailand": "THB", "th": "THB", "bangkok": "THB", "phuket": "THB",
+    "indonesia": "IDR", "id": "IDR", "jakarta": "IDR", "bali": "IDR",
+    "india": "INR", "in": "INR", "delhi": "INR", "mumbai": "INR",
+    "philippines": "PHP", "philippine": "PHP", "philipines": "PHP", "philiplhine": "PHP", "phlippines": "PHP", "ph": "PHP", "manila": "PHP",
+    "hong kong": "HKD", "hk": "HKD", "hkg": "HKD",
+    "taiwan": "TWD", "tw": "TWD", "taipei": "TWD",
+    "new zealand": "NZD", "nz": "NZD", "auckland": "NZD",
+    "switzerland": "CHF", "ch": "CHF", "swiss": "CHF", "zurich": "CHF",
+    "united arab emirates": "AED", "uae": "AED", "dubai": "AED", "abu dhabi": "AED",
+    "saudi arabia": "SAR", "sa": "SAR", "riyadh": "SAR",
+    "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
+    "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
+    "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
+    "kenya": "KES", "ke": "KES", "nairobi": "KES",
+    "morocco": "MAD", "ma": "MAD", "casablanca": "MAD", "marrakech": "MAD",
+    "ghana": "GHS", "gh": "GHS", "accra": "GHS",
+    "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "paris": "EUR", "rome": "EUR"
+  };
+
+  if (mapping[norm]) return mapping[norm];
+
+  const words = norm.split(/[\s,./()|-]+/);
+  const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (key.includes(" ")) {
+      if (norm.includes(key)) return mapping[key];
+    } else if (words.includes(key)) {
+      return mapping[key];
+    }
+  }
+
+  if (norm.includes("phil") || norm.includes("phli") || norm.includes("manila") || norm.includes("philipp")) {
+    return "PHP";
+  }
+  if (norm.includes("sing") || norm.includes("merlion")) {
+    return "SGD";
+  }
+  if (norm.includes("tokyo") || norm.includes("japan") || norm.includes("nrt") || norm.includes("hnd")) {
+    return "JPY";
+  }
+
+  return "USD";
+};
+
 export default function TripCreator({ currentUserId, onTripCreated, isLoading }: TripCreatorProps) {
   // Main states - Start empty so user gets clean input flow
   const [destinations, setDestinations] = useState<string[]>([]);
   const [newDestInput, setNewDestInput] = useState("");
-  const [startDate, setStartDate] = useState("2026-06-20");
-  const [endDate, setEndDate] = useState("2026-06-25");
+  const [startDate, setStartDate] = useState(getTodayString());
+  const [endDate, setEndDate] = useState(getFutureDateString(5));
+  const [homeCountry, setHomeCountry] = useState("");
+  const [preferredCurrency, setPreferredCurrency] = useState("USD");
+  const [showCountrySuggestions, setShowCountrySuggestions] = useState(false);
 
   // Booking states
   const [hasFlights, setHasFlights] = useState(false);
@@ -27,8 +392,8 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       flightNo: "",
       departureAirport: "",
       arrivalAirport: "",
-      departureTime: "2026-06-20T11:55",
-      arrivalTime: "2026-06-20T17:15"
+      departureTime: `${getTodayString()}T11:55`,
+      arrivalTime: `${getTodayString()}T17:15`
     },
     {
       id: "f_2",
@@ -36,8 +401,8 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       flightNo: "",
       departureAirport: "",
       arrivalAirport: "",
-      departureTime: "2026-06-25T11:10",
-      arrivalTime: "2026-06-25T17:30"
+      departureTime: `${getFutureDateString(5)}T11:10`,
+      arrivalTime: `${getFutureDateString(5)}T17:30`
     }
   ]);
 
@@ -47,14 +412,15 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       id: "h_1",
       name: "",
       locationUrl: "",
-      checkIn: "2026-06-20T15:00",
-      checkOut: "2026-06-25T12:00"
+      checkIn: `${getTodayString()}T15:00`,
+      checkOut: `${getFutureDateString(5)}T12:00`
     }
   ]);
 
   const [preferences, setPreferences] = useState("");
   const [wantToGoPlaces, setWantToGoPlaces] = useState<string[]>([]);
   const [newWantToGoInput, setNewWantToGoInput] = useState("");
+  const [destinationStays, setDestinationStays] = useState<Record<string, { start: string; end: string }>>({});
 
   // Destination Autocomplete State
   const [destSuggestions, setDestSuggestions] = useState<{ name: string }[]>([]);
@@ -156,9 +522,27 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
     }
     const activeFlight = flights.find(f => f.id === activeAirportSearch.flightId);
     if (!activeFlight) return;
-    const query = activeAirportSearch.field === "departureAirport" ? activeFlight.departureAirport : activeFlight.arrivalAirport;
+    
+    let queryVal = activeAirportSearch.field === "departureAirport" ? activeFlight.departureAirport : activeFlight.arrivalAirport;
 
-    if (!query || query.trim().length < 1) {
+    // Smart autofill suggestion query if they opened it empty
+    if (!queryVal || queryVal.trim().length === 0) {
+      if (activeFlight.type === "depart") {
+        if (activeAirportSearch.field === "departureAirport") {
+          queryVal = homeCountry || "SIN";
+        } else {
+          queryVal = destinations[0] || "Tokyo";
+        }
+      } else {
+        if (activeAirportSearch.field === "departureAirport") {
+          queryVal = destinations[destinations.length - 1] || destinations[0] || "Tokyo";
+        } else {
+          queryVal = homeCountry || "SIN";
+        }
+      }
+    }
+
+    if (!queryVal || queryVal.trim().length < 1) {
       setAirportSuggestions([]);
       return;
     }
@@ -169,7 +553,7 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
         const res = await fetch("/api/suggest-airports", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: query.trim() })
+          body: JSON.stringify({ query: queryVal.trim() })
         });
         if (res.ok) {
           const data = await res.json();
@@ -182,10 +566,10 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       } finally {
         setIsSearchingAirport(false);
       }
-    }, 300);
+    }, 200); // Faster bounce for quick reactive dropdowns
 
     return () => clearTimeout(timer);
-  }, [activeAirportSearch, flights?.map(f => f.departureAirport + "_" + f.arrivalAirport).join(",")]);
+  }, [activeAirportSearch, flights?.map(f => f.departureAirport + "_" + f.arrivalAirport).join(","), destinations.join("|"), homeCountry]);
 
   // Debounced attractions want-to-go suggestions
   useEffect(() => {
@@ -224,9 +608,65 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
   }, [newWantToGoInput, destinations?.join(",")]);
 
   const handleSelectAirportSuggestion = (flightId: string, field: "departureAirport" | "arrivalAirport", airportCode: string) => {
-    setFlights(flights.map(f => f.id === flightId ? { ...f, [field]: airportCode } : f));
+    setFlights(prev => {
+      const updated = prev.map(f => f.id === flightId ? { ...f, [field]: airportCode } : f);
+      // Auto-mirror airports for standard 2-flight trips:
+      if (updated.length === 2) {
+        const f1 = updated[0];
+        const f2 = updated[1];
+        if (f1.id === flightId) {
+          if (field === "departureAirport" && !f2.arrivalAirport) {
+            f2.arrivalAirport = airportCode;
+          } else if (field === "arrivalAirport" && !f2.departureAirport) {
+            f2.departureAirport = airportCode;
+          }
+        } else if (f2.id === flightId) {
+          if (field === "departureAirport" && !f1.arrivalAirport) {
+            f1.arrivalAirport = airportCode;
+          } else if (field === "arrivalAirport" && !f1.departureAirport) {
+            f1.departureAirport = airportCode;
+          }
+        }
+      }
+      return updated;
+    });
     setActiveAirportSearch(null);
     setAirportSuggestions([]);
+  };
+
+  const getMustGoSuggestions = () => {
+    const list: { name: string; description: string; destination: string }[] = [];
+    destinations.forEach(dest => {
+      const norm = dest.toLowerCase().trim();
+      for (const k of Object.keys(MUST_GO_DICT)) {
+        const isFuzzyMatch = 
+          norm === k || 
+          norm.includes(k) || 
+          k.includes(norm) ||
+          (k.length >= 4 && norm.includes(k.substring(0, 4))) ||
+          (norm.length >= 4 && k.includes(norm.substring(0, 4))) ||
+          (k === "philippines" && (norm.includes("phil") || norm.includes("manila") || norm.includes("phli") || norm.includes("phili"))) ||
+          (k === "singapore" && norm.includes("sing")) ||
+          (k === "tokyo" && norm.includes("tok"));
+
+        if (isFuzzyMatch) {
+          MUST_GO_DICT[k].forEach(attr => {
+            if (!list.some(item => item.name.toLowerCase() === attr.name.toLowerCase())) {
+              list.push({ name: attr.name, description: attr.description, destination: dest });
+            }
+          });
+        }
+      }
+    });
+    return list;
+  };
+
+  const handleToggleMustGoSuggestion = (name: string) => {
+    if (wantToGoPlaces.some(p => p.toLowerCase() === name.toLowerCase())) {
+      setWantToGoPlaces(prev => prev.filter(p => p.toLowerCase() !== name.toLowerCase()));
+    } else {
+      setWantToGoPlaces(prev => [...prev, name]);
+    }
   };
 
   const handleSelectWantToGoSuggestion = (suggestionName: string) => {
@@ -238,7 +678,66 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
     setShowWantToGoDropdown(false);
   };
 
-  // Keep flight and hotel dates of existing bookings dynamically in sync with main Trip dates
+  // Keep destination stays up to date during multi-stop entries
+  useEffect(() => {
+    if (destinations.length > 0) {
+      const parsedStart = new Date(startDate);
+      const parsedEnd = new Date(endDate);
+      if (!isNaN(parsedStart.getTime()) && !isNaN(parsedEnd.getTime())) {
+        const totalNights = Math.max(1, Math.round((parsedEnd.getTime() - parsedStart.getTime()) / (1000 * 60 * 60 * 24)));
+        const numDests = destinations.length;
+        const nightsPerDest = Math.max(1, Math.floor(totalNights / numDests));
+
+        setDestinationStays(prev => {
+          const next = { ...prev };
+          let changed = false;
+
+          // Remove deleted destinations
+          Object.keys(next).forEach(k => {
+            if (!destinations.includes(k)) {
+              delete next[k];
+              changed = true;
+            }
+          });
+
+          // Prepopulate default splits for any new destinations or off-limit ones
+          destinations.forEach((dest, idx) => {
+            const startDaysOffset = idx * nightsPerDest;
+            const endDaysOffset = idx === numDests - 1 ? totalNights : (idx + 1) * nightsPerDest;
+
+            const hotelStart = new Date(parsedStart);
+            hotelStart.setDate(hotelStart.getDate() + startDaysOffset);
+
+            const hotelEnd = new Date(parsedStart);
+            hotelEnd.setDate(hotelEnd.getDate() + endDaysOffset);
+
+            const hotelStartStr = hotelStart.toISOString().split("T")[0];
+            const hotelEndStr = hotelEnd.toISOString().split("T")[0];
+
+            if (!next[dest] || next[dest].start < startDate || next[dest].end > endDate || next[dest].start > next[dest].end) {
+              next[dest] = { start: hotelStartStr, end: hotelEndStr };
+              changed = true;
+            }
+          });
+
+          return changed ? next : prev;
+        });
+      }
+    } else {
+      setDestinationStays({});
+    }
+  }, [destinations.join("|"), startDate, endDate]);
+
+  useEffect(() => {
+    if (destinations.length > 0) {
+      const destCurrency = mapCountryToCurrency(destinations[0]);
+      if (destCurrency) {
+        setPreferredCurrency(destCurrency);
+      }
+    }
+  }, [destinations.join("|")]);
+
+  // Keep flight and hotel dates of existing bookings dynamically in sync with custom Stay dates / Trip dates
   useEffect(() => {
     setFlights(prev => prev.map(f => {
       if (f.type === "depart") {
@@ -261,21 +760,221 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       return f;
     }));
 
-    setHotels(prev => prev.map(h => {
-      const checkInTime = h.checkIn && h.checkIn.includes("T") ? h.checkIn.split("T")[1] : "15:00";
-      const checkOutTime = h.checkOut && h.checkOut.includes("T") ? h.checkOut.split("T")[1] : "12:00";
-      return {
-        ...h,
-        checkIn: `${startDate}T${checkInTime}`,
-        checkOut: `${endDate}T${checkOutTime}`
-      };
-    }));
-  }, [startDate, endDate]);
+    if (destinations.length > 0) {
+      setHotels(prev => {
+        if (prev.length === 0) {
+          return destinations.map((dest, idx) => {
+            const stayDates = destinationStays[dest];
+            const checkInDate = stayDates?.start || startDate;
+            const checkOutDate = stayDates?.end || endDate;
+            return {
+              id: `h_${idx}_${Date.now()}`,
+              name: "",
+              locationUrl: dest,
+              checkIn: `${checkInDate}T15:00`,
+              checkOut: `${checkOutDate}T12:00`
+            };
+          });
+        }
+
+        // If there are existing hotels but some destinations don't have a hotel, append them
+        const updated = [...prev];
+        destinations.forEach((dest, idx) => {
+          const hasHotel = updated.some(h => {
+            const loc = (h.locationUrl || "").toLowerCase();
+            const d = dest.toLowerCase();
+            return loc.includes(d) || d.includes(loc);
+          });
+          if (!hasHotel && idx >= updated.length) {
+            const stayDates = destinationStays[dest];
+            const checkInDate = stayDates?.start || startDate;
+            const checkOutDate = stayDates?.end || endDate;
+            updated.push({
+              id: `h_new_${idx}_${Date.now()}`,
+              name: "",
+              locationUrl: dest,
+              checkIn: `${checkInDate}T15:00`,
+              checkOut: `${checkOutDate}T12:00`
+            });
+          }
+        });
+        return updated;
+      });
+    } else {
+      setHotels(prev => {
+        const existing = prev[0];
+        return [{
+          id: existing?.id || "h_1",
+          name: existing?.name || "",
+          locationUrl: existing?.locationUrl || "",
+          checkIn: `${startDate}T15:00`,
+          checkOut: `${endDate}T12:00`
+        }];
+      });
+    }
+  }, [startDate, endDate, destinations.join("|"), destinationStays]);
+
+  const getAirportRecommendationsForField = (flight: FlightInfo, field: "departureAirport" | "arrivalAirport") => {
+    const list: { code: string; name: string; label: string; date?: string }[] = [];
+
+    // Let's resolve what dates/stops map to this flight
+    const flightDate = flight.departureTime ? flight.departureTime.split("T")[0] : null;
+
+    // Helper to add safely
+    const addAirportsForLoc = (loc: string, label: string, date?: string) => {
+      const norm = loc.toLowerCase().trim();
+      if (!norm) return;
+
+      const parts = norm.split(/[\s,.-]+/).filter(Boolean);
+
+      for (const key of Object.keys(AIRPORT_MAP)) {
+        const isExactMatch = norm === key || norm.includes(key) || key.includes(norm);
+        const isWordMatch = parts.some(p => p.length >= 3 && (key === p || key.includes(p)));
+
+        if (isExactMatch || isWordMatch) {
+          AIRPORT_MAP[key].forEach(a => {
+            if (!list.some(item => item.code === a.code)) {
+              list.push({ ...a, label, date });
+            }
+          });
+        }
+      }
+    };
+
+    // Let's analyze flight type & field
+    if (flight.type === "depart") {
+      if (field === "departureAirport") {
+        if (homeCountry) {
+          addAirportsForLoc(homeCountry, `Home (${homeCountry})`);
+        } else {
+          list.push({ code: "SIN", name: "Singapore Changi Airport", label: "Default Home Hub" });
+        }
+      } else {
+        // Arrival for departures. Let's see stay dates!
+        if (flightDate && destinations.length > 0) {
+          let matched = false;
+          destinations.forEach(dest => {
+            const stay = destinationStays[dest];
+            if (stay && flightDate >= stay.start && flightDate <= stay.end) {
+              addAirportsForLoc(dest, `${dest} Stay`, `${stay.start} to ${stay.end}`);
+              matched = true;
+            }
+          });
+          if (!matched) {
+            // First stop is default for arrival of departure flight
+            const firstDest = destinations[0];
+            if (firstDest) {
+              const stay = destinationStays[firstDest];
+              addAirportsForLoc(firstDest, `${firstDest} (First Stop)`, stay ? `${stay.start} to ${stay.end}` : undefined);
+            }
+          }
+        } else if (destinations.length > 0) {
+          const firstDest = destinations[0];
+          const stay = destinationStays[firstDest];
+          addAirportsForLoc(firstDest, `${firstDest} (First Stop)`, stay ? `${stay.start} to ${stay.end}` : undefined);
+        }
+      }
+    } else {
+      // return flights
+      if (field === "departureAirport") {
+        // Departing from last or active stop.
+        if (flightDate && destinations.length > 0) {
+          let matched = false;
+          destinations.forEach(dest => {
+            const stay = destinationStays[dest];
+            if (stay && flightDate >= stay.start && flightDate <= stay.end) {
+              addAirportsForLoc(dest, `${dest} Stay`, `${stay.start} to ${stay.end}`);
+              matched = true;
+            }
+          });
+          if (!matched) {
+            const lastDest = destinations[destinations.length - 1] || destinations[0];
+            if (lastDest) {
+              const stay = destinationStays[lastDest];
+              addAirportsForLoc(lastDest, `${lastDest} (Last Stop)`, stay ? `${stay.start} to ${stay.end}` : undefined);
+            }
+          }
+        } else if (destinations.length > 0) {
+          const lastDest = destinations[destinations.length - 1] || destinations[0];
+          const stay = destinationStays[lastDest];
+          addAirportsForLoc(lastDest, `${lastDest} (Last Stop)`, stay ? `${stay.start} to ${stay.end}` : undefined);
+        }
+      } else {
+        // Arrival is homeCountry
+        if (homeCountry) {
+          addAirportsForLoc(homeCountry, `Home (${homeCountry})`);
+        } else {
+          list.push({ code: "SIN", name: "Singapore Changi Airport", label: "Default Home Hub" });
+        }
+      }
+    }
+
+    // Always include ALL itinerary destinations so they are easily accessible in the dropdown at all times!
+    destinations.forEach(dest => {
+      addAirportsForLoc(dest, `${dest}`);
+    });
+
+    if (homeCountry) {
+      addAirportsForLoc(homeCountry, `Home (${homeCountry})`);
+    }
+
+    // Also filter the recommendations locally if they have typed something
+    const typed = field === "departureAirport" ? flight.departureAirport : flight.arrivalAirport;
+    if (typed && typed.trim().length > 0) {
+      const q = typed.toLowerCase().trim();
+      return list.filter(item => 
+        item.code.toLowerCase().includes(q) || 
+        item.name.toLowerCase().includes(q) || 
+        item.label.toLowerCase().includes(q)
+      ).slice(0, 25);
+    }
+
+    return list.slice(0, 25);
+  };
 
   const handleStartDateChange = (newDate: string) => {
     setStartDate(newDate);
     if (endDate < newDate) {
       setEndDate(newDate);
+    }
+  };
+
+  const handleUpdateDestinationStay = (dest: string, field: "start" | "end", value: string) => {
+    const updatedStays = {
+      ...destinationStays,
+      [dest]: {
+        ...(destinationStays[dest] || { start: startDate, end: endDate }),
+        [field]: value
+      }
+    };
+    
+    // Ensure chronological safety per location
+    const stay = updatedStays[dest];
+    if (field === "start" && stay.end < value) {
+      stay.end = value;
+    } else if (field === "end" && stay.start > value) {
+      stay.start = value;
+    }
+    
+    setDestinationStays(updatedStays);
+
+    // Compute min start and max end across all active destinations to expand or contract trip bounds
+    let minStart = value;
+    let maxEnd = value;
+    
+    destinations.forEach((d) => {
+      const s = updatedStays[d];
+      if (s) {
+        if (s.start && s.start < minStart) minStart = s.start;
+        if (s.end && s.end > maxEnd) maxEnd = s.end;
+      }
+    });
+
+    setStartDate(minStart);
+    if (maxEnd < minStart) {
+      setEndDate(minStart);
+    } else {
+      setEndDate(maxEnd);
     }
   };
 
@@ -342,7 +1041,28 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
   };
 
   const handleUpdateFlight = (id: string, field: keyof FlightInfo, value: string) => {
-    setFlights(flights.map(f => f.id === id ? { ...f, [field]: value } : f));
+    setFlights(prev => {
+      const updated = prev.map(f => f.id === id ? { ...f, [field]: value } : f);
+      // Auto-mirror airports for standard 2-flight trips:
+      if (updated.length === 2 && (field === "departureAirport" || field === "arrivalAirport")) {
+        const f1 = updated[0];
+        const f2 = updated[1];
+        if (f1.id === id) {
+          if (field === "departureAirport") {
+            f2.arrivalAirport = value;
+          } else if (field === "arrivalAirport") {
+            f2.departureAirport = value;
+          }
+        } else if (f2.id === id) {
+          if (field === "departureAirport") {
+            f1.arrivalAirport = value;
+          } else if (field === "arrivalAirport") {
+            f1.departureAirport = value;
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   // Hotels Handlers
@@ -401,12 +1121,15 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
       userId: currentUserId,
       destinationName: destinations.join(" & "),
       destinations: destinations,
+      destinationStays: destinationStays,
       startDate: startDate,
       endDate: endDate,
       flights: hasFlights ? flights : [],
       hotels: hasHotels ? hotels : [],
       preferences: preferences.trim(),
       wantToGoPlaces: wantToGoPlaces,
+      displayCurrency: preferredCurrency,
+      homeCountry: homeCountry,
       createdAt: new Date().toISOString()
     };
 
@@ -490,19 +1213,12 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={handleAddDestination}
-              className="px-4 py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4 text-slate-500" /> Add Stop
-            </button>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
             {destinations.length === 0 ? (
               <div className="text-xs text-amber-600 font-semibold bg-amber-50/70 border border-amber-100 rounded-xl px-4 py-2.5 w-full flex items-center gap-1.5 leading-relaxed">
-                ⚠️ Click "Add Stop" above to define your destinations (e.g., Paris, Seoul, Bali).
+                ⚠️ Type and press Enter/Select to define your destinations (e.g., Paris, Seoul, Bali).
               </div>
             ) : (
               destinations.map((dest, i) => (
@@ -524,41 +1240,246 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
           </div>
         </div>
 
-        {/* Date Ranges */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-              Start Date
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <Calendar className="w-4 h-4" />
-              </span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => handleStartDateChange(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition outline-none"
-                required
-              />
+        {/* Date Ranges (Only show for single or empty destinations to avoid clutter when multiple destinations are specified) */}
+        {destinations.length < 2 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                Start Date
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar className="w-4 h-4" />
+                </span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition outline-none"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                End Date
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Calendar className="w-4 h-4" />
+                </span>
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition outline-none"
+                  required
+                />
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
-              End Date
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                <Calendar className="w-4 h-4" />
-              </span>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/50 text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition outline-none"
-                required
-              />
+        )}
+
+        {/* Destination Stays (Multi-stop stay intervals builder) */}
+        {destinations.length >= 2 && (
+          <div className="p-6 bg-indigo-50/40 border border-indigo-150 rounded-2xl space-y-4">
+            <div className="flex items-start gap-2.5">
+              <span className="text-lg">🗺️</span>
+              <div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-widest">
+                  Stay Dates for each location
+                </label>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                  Excellent! You have added <strong>{destinations.length} stops</strong>. Please specify when you will stay in each location. 
+                  These custom intervals will automatically set your trip parameters, prefill your Accoms check-in/check-out, and help you plan Flights!
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {destinations.map((dest) => {
+                const currentStay = destinationStays[dest] || { start: startDate, end: endDate };
+                return (
+                  <div key={dest} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-3xs hover:border-indigo-200 transition">
+                    <h4 className="text-xs font-black text-slate-850 flex items-center gap-1.5 truncate">
+                      <span className="text-sm">📍</span>
+                      {dest}
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider font-mono">Stay From</label>
+                        <input
+                          type="date"
+                          value={currentStay.start}
+                          onChange={(e) => handleUpdateDestinationStay(dest, "start", e.target.value)}
+                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:bg-white focus:border-indigo-600 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider font-mono">Stay To</label>
+                        <input
+                          type="date"
+                          value={currentStay.end}
+                          min={currentStay.start}
+                          onChange={(e) => handleUpdateDestinationStay(dest, "end", e.target.value)}
+                          className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:bg-white focus:border-indigo-600 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Home Country & Preferred Display Currency */}
+        <div className="p-6 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-4">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base mt-0.5">🏡</span>
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-widest">
+                Home Country & Preferred Currency
+              </label>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                Tell us where you are based. Type any country freely—our assistant will automatically preset your currency!
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-mono">
+                My Home Country
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={homeCountry}
+                  onFocus={() => setShowCountrySuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowCountrySuggestions(false), 200)}
+                  onChange={(e) => {
+                    const countryVal = e.target.value;
+                    setHomeCountry(countryVal);
+                    
+                    // Smart helper to detect & map countries dynamically
+                    const norm = countryVal.toLowerCase().trim();
+                    const currencyMap: Record<string, string> = {
+                      "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
+                      "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
+                      "malaysia": "MYR", "my": "MYR", "mys": "MYR",
+                      "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY",
+                      "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
+                      "australia": "AUD", "au": "AUD", "aus": "AUD",
+                      "canada": "CAD", "ca": "CAD", "can": "CAD",
+                      "china": "CNY", "cn": "CNY", "beijing": "CNY",
+                      "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
+                      "thailand": "THB", "th": "THB", "bangkok": "THB",
+                      "indonesia": "IDR", "id": "IDR", "jakarta": "IDR",
+                      "india": "INR", "in": "INR", "delhi": "INR",
+                      "philippines": "PHP", "ph": "PHP", "manila": "PHP",
+                      "hong kong": "HKD", "hk": "HKD",
+                      "taiwan": "TWD", "tw": "TWD",
+                      "new zealand": "NZD", "nz": "NZD",
+                      "switzerland": "CHF", "ch": "CHF", "swiss": "CHF",
+                      "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
+                      "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
+                      "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
+                      "kenya": "KES", "ke": "KES", "nairobi": "KES",
+                      "morocco": "MAD", "ma": "MAD", "casablanca": "MAD",
+                      "ghana": "GHS", "gh": "GHS", "accra": "GHS",
+                      "germany": "EUR", "france": "EUR", "italy": "EUR", "spain": "EUR", 
+                      "netherlands": "EUR", "belgium": "EUR", "austria": "EUR", "greece": "EUR", 
+                      "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "europe": "EUR"
+                    };
+
+                    // Search for a keyword match in our dictionary
+                    for (const key of Object.keys(currencyMap)) {
+                      if (norm === key || norm.includes(key)) {
+                        setPreferredCurrency(currencyMap[key]);
+                        break;
+                      }
+                    }
+                  }}
+                  placeholder="e.g. Singapore, Japan, France, etc..."
+                  className="w-full px-4 py-2.5 bg-white text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition outline-none"
+                />
+
+                {showCountrySuggestions && (
+                  <div className="absolute z-50 left-0 right-0 mt-1 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100">
+                    <div className="px-3.5 py-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">
+                      {homeCountry.trim() === "" ? "⭐️ Popular Hubs" : "Matches"}
+                    </div>
+                    {POPULAR_COUNTRIES.filter((c) => {
+                      if (homeCountry.trim() === "") return true;
+                      return (
+                        c.name.toLowerCase().includes(homeCountry.toLowerCase()) ||
+                        c.currency.toLowerCase().includes(homeCountry.toLowerCase())
+                      );
+                    })
+                      .slice(0, 8)
+                      .map((match) => (
+                        <div
+                          key={match.name}
+                          onMouseDown={() => {
+                            setHomeCountry(match.name);
+                            setPreferredCurrency(match.currency);
+                            setShowCountrySuggestions(false);
+                          }}
+                          className="flex items-center justify-between px-3.5 py-2.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>{match.flag}</span>
+                            <span className="font-medium text-slate-800">{match.name}</span>
+                          </div>
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded">
+                            {match.currency}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-mono">
+                Preferred Display Currency
+              </label>
+              <select
+                value={preferredCurrency}
+                onChange={(e) => setPreferredCurrency(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white text-slate-800 text-sm border border-slate-200 focus:border-indigo-600 rounded-xl transition font-semibold text-indigo-750 outline-none cursor-pointer"
+              >
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="SGD">SGD (S$)</option>
+                <option value="AUD">AUD (A$)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="MYR">MYR (RM)</option>
+                <option value="CNY">CNY (¥)</option>
+                <option value="KRW">KRW (₩)</option>
+                <option value="THB">THB (฿)</option>
+                <option value="IDR">IDR (Rp)</option>
+                <option value="INR">INR (₹)</option>
+                <option value="PHP">PHP (₱)</option>
+                <option value="HKD">HKD (HK$)</option>
+                <option value="TWD">TWD (NT$)</option>
+                <option value="NZD">NZD (NZ$)</option>
+                <option value="CHF">CHF (CHF)</option>
+                <option value="AED">AED (AED)</option>
+                <option value="SAR">SAR (SR)</option>
+                <option value="ZAR">ZAR (R)</option>
+                <option value="NGN">NGN (₦)</option>
+                <option value="KES">KES (KSh)</option>
+                <option value="EGP">EGP (E£)</option>
+                <option value="MAD">MAD (DH)</option>
+                <option value="GHS">GHS (GH₵)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -589,143 +1510,229 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
 
           {hasFlights && (
             <div className="space-y-4 pt-2">
-              {flights.map((flight, idx) => (
-                <div key={flight.id} className="relative bg-white border border-slate-200 rounded-xl p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                      Flight #{idx + 1} ({flight.type === 'depart' ? 'Outbound' : 'Return'})
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={flight.type}
-                        onChange={(e) => handleUpdateFlight(flight.id, "type", e.target.value as any)}
-                        className="text-xs px-2 py-1 bg-[#F8FAFC] rounded border border-slate-200 font-bold uppercase tracking-wider"
-                      >
-                        <option value="depart">Depart</option>
-                        <option value="return">Return</option>
-                      </select>
-                      {flights.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFlight(flight.id)}
-                          className="text-rose-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+              {flights.map((flight, idx) => {
+                const recommendedDepartures = getAirportRecommendationsForField(flight, "departureAirport");
+                const recommendedArrivals = getAirportRecommendationsForField(flight, "arrivalAirport");
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Flight Number (e.g. SQ638)"
-                        value={flight.flightNo}
-                        onChange={(e) => handleUpdateFlight(flight.id, "flightNo", e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
-                        required
-                      />
+                return (
+                  <div key={flight.id} className="relative bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                        Flight #{idx + 1} ({flight.type === 'depart' ? 'Outbound' : 'Return'})
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={flight.type}
+                          onChange={(e) => handleUpdateFlight(flight.id, "type", e.target.value as any)}
+                          className="text-xs px-2 py-1 bg-[#F8FAFC] rounded border border-slate-200 font-bold uppercase tracking-wider"
+                        >
+                          <option value="depart">Depart</option>
+                          <option value="return">Return</option>
+                        </select>
+                        {flights.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFlight(flight.id)}
+                            className="text-rose-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Departure Airport (e.g. SIN)"
-                        value={flight.departureAirport}
-                        onChange={(e) => {
-                          handleUpdateFlight(flight.id, "departureAirport", e.target.value);
-                          setActiveAirportSearch({ flightId: flight.id, field: "departureAirport" });
-                        }}
-                        onFocus={() => setActiveAirportSearch({ flightId: flight.id, field: "departureAirport" })}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            setActiveAirportSearch(prev => prev?.flightId === flight.id && prev?.field === "departureAirport" ? null : prev);
-                          }, 300);
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
-                        required
-                      />
-                      {activeAirportSearch?.flightId === flight.id && activeAirportSearch?.field === "departureAirport" && (flight.departureAirport.trim().length > 0 || isSearchingAirport) && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                          {isSearchingAirport && (
-                            <div className="flex items-center gap-2 px-3 py-2.5 text-[10px] text-slate-400 font-medium">
-                              <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
-                              <span>Searching airports...</span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Flight Number (e.g. SQ638)"
+                          value={flight.flightNo}
+                          onChange={(e) => handleUpdateFlight(flight.id, "flightNo", e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
+                          required
+                        />
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Departure Airport (e.g. SIN)"
+                          value={flight.departureAirport}
+                          onChange={(e) => {
+                            handleUpdateFlight(flight.id, "departureAirport", e.target.value);
+                            setActiveAirportSearch({ flightId: flight.id, field: "departureAirport" });
+                          }}
+                          onFocus={() => setActiveAirportSearch({ flightId: flight.id, field: "departureAirport" })}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveAirportSearch(prev => prev?.flightId === flight.id && prev?.field === "departureAirport" ? null : prev);
+                            }, 300);
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
+                          required
+                        />
+                        {activeAirportSearch?.flightId === flight.id && activeAirportSearch?.field === "departureAirport" && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                            {recommendedDepartures.length > 0 && (
+                              <div>
+                                <div className="px-3 py-1.5 bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                  <span>💡 Route Recommendations</span>
+                                  {flight.departureAirport.trim().length > 0 && (
+                                    <span className="text-[8px] bg-indigo-50 text-indigo-600 px-1 rounded">Filtered</span>
+                                  )}
+                                </div>
+                                {recommendedDepartures.map((rec, rIdx) => (
+                                  <button
+                                    key={`rec_dep_${rIdx}`}
+                                    type="button"
+                                    onMouseDown={() => handleSelectAirportSuggestion(flight.id, "departureAirport", rec.code)}
+                                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between border-b border-slate-50/50 transition cursor-pointer"
+                                  >
+                                    <div className="truncate">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-extrabold text-[#4F46E5] font-mono">✈️ {rec.code}</span>
+                                        <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">{rec.label}</span>
+                                      </div>
+                                      <div className="text-[9px] text-slate-500 truncate">{rec.name}</div>
+                                    </div>
+                                    {rec.date && (
+                                      <span className="text-[8px] font-bold font-mono px-1 py-0.5 bg-indigo-50 text-indigo-600 rounded">
+                                        {rec.date}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="px-3 py-1.5 bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                {isSearchingAirport ? "🔍 Sourcing airport data..." : "🔍 Search Results & Matches"}
+                              </div>
+                              {isSearchingAirport && (
+                                <div className="flex items-center gap-2 px-3 py-2.5 text-[10px] text-slate-400 font-medium">
+                                  <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
+                                  <span>Searching airports...</span>
+                                </div>
+                              )}
+                              {!isSearchingAirport && airportSuggestions.length > 0 && (
+                                <div className="divide-y divide-slate-100">
+                                  {airportSuggestions.map((s, aIdx) => (
+                                    <button
+                                      key={`dep_api_${aIdx}`}
+                                      type="button"
+                                      onMouseDown={() => handleSelectAirportSuggestion(flight.id, "departureAirport", s.code)}
+                                      className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs text-slate-700 font-semibold cursor-pointer flex flex-col transition"
+                                    >
+                                      <span className="text-slate-900 font-bold">
+                                        ✈️ {s.code}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 truncate max-w-full">
+                                        {s.name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {!isSearchingAirport && airportSuggestions.length === 0 && recommendedDepartures.length === 0 && (
+                                <div className="px-3 py-2.5 text-[10px] text-slate-400 italic">
+                                  No airports matched. You can type any custom 3-letter code!
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {!isSearchingAirport && airportSuggestions.length === 0 && (
-                            <div className="px-3 py-2.5 text-[10px] text-slate-400 italic">
-                              No matching airport found
+                          </div>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Arrival Airport (e.g. NRT)"
+                          value={flight.arrivalAirport}
+                          onChange={(e) => {
+                            handleUpdateFlight(flight.id, "arrivalAirport", e.target.value);
+                            setActiveAirportSearch({ flightId: flight.id, field: "arrivalAirport" });
+                          }}
+                          onFocus={() => setActiveAirportSearch({ flightId: flight.id, field: "arrivalAirport" })}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveAirportSearch(prev => prev?.flightId === flight.id && prev?.field === "arrivalAirport" ? null : prev);
+                            }, 300);
+                          }}
+                          className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
+                          required
+                        />
+                        {activeAirportSearch?.flightId === flight.id && activeAirportSearch?.field === "arrivalAirport" && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                            {recommendedArrivals.length > 0 && (
+                              <div>
+                                <div className="px-3 py-1.5 bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                  <span>💡 Route Recommendations</span>
+                                  {flight.arrivalAirport.trim().length > 0 && (
+                                    <span className="text-[8px] bg-indigo-50 text-indigo-600 px-1 rounded">Filtered</span>
+                                  )}
+                                </div>
+                                {recommendedArrivals.map((rec, rIdx) => (
+                                  <button
+                                    key={`rec_arr_${rIdx}`}
+                                    type="button"
+                                    onMouseDown={() => handleSelectAirportSuggestion(flight.id, "arrivalAirport", rec.code)}
+                                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between border-b border-slate-50/50 transition cursor-pointer"
+                                  >
+                                    <div className="truncate">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-extrabold text-[#4F46E5] font-mono">✈️ {rec.code}</span>
+                                        <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">{rec.label}</span>
+                                      </div>
+                                      <div className="text-[9px] text-slate-500 truncate">{rec.name}</div>
+                                    </div>
+                                    {rec.date && (
+                                      <span className="text-[8px] font-bold font-mono px-1 py-0.5 bg-indigo-50 text-indigo-600 rounded">
+                                        {rec.date}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="px-3 py-1.5 bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                {isSearchingAirport ? "🔍 Sourcing airport data..." : "🔍 Search Results & Matches"}
+                              </div>
+                              {isSearchingAirport && (
+                                <div className="flex items-center gap-2 px-3 py-2.5 text-[10px] text-slate-400 font-medium">
+                                  <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
+                                  <span>Searching airports...</span>
+                                </div>
+                              )}
+                              {!isSearchingAirport && airportSuggestions.length > 0 && (
+                                <div className="divide-y divide-slate-100">
+                                  {airportSuggestions.map((s, aIdx) => (
+                                    <button
+                                      key={`arr_api_${aIdx}`}
+                                      type="button"
+                                      onMouseDown={() => handleSelectAirportSuggestion(flight.id, "arrivalAirport", s.code)}
+                                      className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs text-slate-700 font-semibold cursor-pointer flex flex-col transition"
+                                    >
+                                      <span className="text-slate-900 font-bold">
+                                        ✈️ {s.code}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 truncate max-w-full">
+                                        {s.name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {!isSearchingAirport && airportSuggestions.length === 0 && recommendedArrivals.length === 0 && (
+                                <div className="px-3 py-2.5 text-[10px] text-slate-400 italic">
+                                  No airports matched. You can type any custom 3-letter code!
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {airportSuggestions.map((s, aIdx) => (
-                            <button
-                              key={aIdx}
-                              type="button"
-                              onMouseDown={() => handleSelectAirportSuggestion(flight.id, "departureAirport", s.code)}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs text-slate-700 font-semibold cursor-pointer flex flex-col transition"
-                            >
-                              <span className="text-slate-900 font-bold">
-                                ✈️ {s.code}
-                              </span>
-                              <span className="text-[9px] text-slate-400 truncate max-w-full">
-                                {s.name}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Arrival Airport (e.g. NRT)"
-                        value={flight.arrivalAirport}
-                        onChange={(e) => {
-                          handleUpdateFlight(flight.id, "arrivalAirport", e.target.value);
-                          setActiveAirportSearch({ flightId: flight.id, field: "arrivalAirport" });
-                        }}
-                        onFocus={() => setActiveAirportSearch({ flightId: flight.id, field: "arrivalAirport" })}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            setActiveAirportSearch(prev => prev?.flightId === flight.id && prev?.field === "arrivalAirport" ? null : prev);
-                          }, 300);
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 text-slate-800 text-xs border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
-                        required
-                      />
-                      {activeAirportSearch?.flightId === flight.id && activeAirportSearch?.field === "arrivalAirport" && (flight.arrivalAirport.trim().length > 0 || isSearchingAirport) && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                          {isSearchingAirport && (
-                            <div className="flex items-center gap-2 px-3 py-2.5 text-[10px] text-slate-400 font-medium">
-                              <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
-                              <span>Searching airports...</span>
-                            </div>
-                          )}
-                          {!isSearchingAirport && airportSuggestions.length === 0 && (
-                            <div className="px-3 py-2.5 text-[10px] text-slate-400 italic">
-                              No matching airport found
-                            </div>
-                          )}
-                          {airportSuggestions.map((s, aIdx) => (
-                            <button
-                              key={aIdx}
-                              type="button"
-                              onMouseDown={() => handleSelectAirportSuggestion(flight.id, "arrivalAirport", s.code)}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs text-slate-700 font-semibold cursor-pointer flex flex-col transition"
-                            >
-                              <span className="text-slate-900 font-bold">
-                                ✈️ {s.code}
-                              </span>
-                              <span className="text-[9px] text-slate-400 truncate max-w-full">
-                                {s.name}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div>
@@ -749,8 +1756,66 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
                       />
                     </div>
                   </div>
+
+                  {/* Stay dates helper for flight card */}
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono mr-1">Quick-Fill:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateFlight(flight.id, "departureTime", `${startDate}T09:00`);
+                        handleUpdateFlight(flight.id, "arrivalTime", `${startDate}T13:00`);
+                      }}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold transition cursor-pointer"
+                    >
+                      Trip Start ({startDate})
+                    </button>
+                    
+                    {destinations.map((dest) => {
+                      const stay = destinationStays[dest];
+                      if (!stay) return null;
+                      return (
+                        <React.Fragment key={dest}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUpdateFlight(flight.id, "departureTime", `${stay.start}T11:00`);
+                              handleUpdateFlight(flight.id, "arrivalTime", `${stay.start}T15:00`);
+                            }}
+                            className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold transition cursor-pointer"
+                            title={`Set flight date to stay-start at ${dest}`}
+                          >
+                            📍 {dest} In ({stay.start})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUpdateFlight(flight.id, "departureTime", `${stay.end}T14:00`);
+                              handleUpdateFlight(flight.id, "arrivalTime", `${stay.end}T18:00`);
+                            }}
+                            className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-semibold transition cursor-pointer"
+                            title={`Set flight date to stay-end at ${dest}`}
+                          >
+                            🏁 {dest} Out ({stay.end})
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateFlight(flight.id, "departureTime", `${endDate}T11:00`);
+                        handleUpdateFlight(flight.id, "arrivalTime", `${endDate}T15:00`);
+                      }}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold transition cursor-pointer"
+                    >
+                      Trip End ({endDate})
+                    </button>
+                  </div>
                 </div>
-              ))}
+              );
+            })}
 
               <button
                 type="button"
@@ -812,7 +1877,7 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
                       <div className="flex gap-2 relative">
                         <input
                           type="text"
-                          placeholder="e.g. Shinjuku Hotel, or Google Map URL..."
+                          placeholder={destinations[idx] ? `Hotel in ${destinations[idx]}` : "e.g. Shinjuku Hotel, or Google Map URL..."}
                           value={hotel.name}
                           onChange={(e) => {
                             handleUpdateHotel(hotel.id, "name", e.target.value);
@@ -900,6 +1965,44 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
                           className="w-full px-3 py-2 bg-slate-50 text-slate-800 border border-slate-200 rounded-lg focus:bg-white focus:border-indigo-600 outline-none"
                           required
                         />
+                      </div>
+                    </div>
+
+                    {/* Quick Sync Hotel stay dates with Destinations or Trip */}
+                    <div className="space-y-1 border-t border-slate-105 border-slate-100 pt-3">
+                      <span className="block text-[10px] font-black text-slate-400 tracking-widest font-mono uppercase">
+                        ⏰ Quick Sync Stay Dates:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUpdateHotel(hotel.id, "checkIn", `${startDate}T15:00`);
+                            handleUpdateHotel(hotel.id, "checkOut", `${endDate}T12:00`);
+                          }}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-bold text-[10px] transition cursor-pointer"
+                          title="Set hotel stay for full duration of trip"
+                        >
+                          Full Trip ({startDate} to {endDate})
+                        </button>
+
+                        {destinations.map((dest) => {
+                          const stay = destinationStays[dest] || { start: startDate, end: endDate };
+                          return (
+                            <button
+                              key={dest}
+                              type="button"
+                              onClick={() => {
+                                handleUpdateHotel(hotel.id, "checkIn", `${stay.start}T15:00`);
+                                handleUpdateHotel(hotel.id, "checkOut", `${stay.end}T12:00`);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100/40 rounded font-bold text-[10px] transition cursor-pointer"
+                              title={`Sync hotel to matching stay dates for ${dest}`}
+                            >
+                              Sync {dest} ({stay.start} to {stay.end})
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -1000,6 +2103,54 @@ export default function TripCreator({ currentUserId, onTripCreated, isLoading }:
               </div>
             )}
           </div>
+
+          {/* Curated click-to-choose must-go attractions depends on selected destinations */}
+          {destinations.length > 0 && getMustGoSuggestions().length > 0 && (
+            <div className="bg-slate-50/60 border border-slate-200/50 p-4.5 rounded-2xl space-y-3 max-w-xl">
+              <div>
+                <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                  🌟 Highly Recommended Must-Go Spots
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Click on an attraction below to quick-add it to your planned wishlist bucket:
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                {getMustGoSuggestions().map((item, index) => {
+                  const isAlreadyAdded = wantToGoPlaces.some(p => p.toLowerCase() === item.name.toLowerCase());
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleToggleMustGoSuggestion(item.name)}
+                      className={`p-3 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between gap-1.5 cursor-pointer relative overflow-hidden ${
+                        isAlreadyAdded
+                          ? "bg-slate-900 border-slate-900 text-white shadow-sm"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/10"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between w-full gap-2">
+                        <span className="font-bold text-xs leading-tight">{item.name}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase shrink-0 font-mono tracking-wider ${
+                          isAlreadyAdded ? "bg-white/10 text-white" : "bg-indigo-50/80 text-indigo-700"
+                        }`}>
+                          {item.destination}
+                        </span>
+                      </div>
+                      <p className={`text-[10px] leading-relaxed line-clamp-2 ${isAlreadyAdded ? "text-slate-350 text-slate-300" : "text-slate-450"}`}>
+                        {item.description}
+                      </p>
+                      <span className={`text-[9px] font-black uppercase self-end flex items-center gap-1 mt-1 font-mono tracking-widest ${
+                        isAlreadyAdded ? "text-indigo-300" : "text-slate-400"
+                      }`}>
+                        {isAlreadyAdded ? "✓ Added to Wishlist" : "+ Add to Wishlist"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {wantToGoPlaces.length > 0 ? (
             <div className="flex flex-wrap gap-2 pt-2">

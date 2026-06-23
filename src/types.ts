@@ -57,6 +57,7 @@ export interface Trip {
   userId: string;
   destinationName: string;
   destinations: string[]; // multi-place support
+  destinationStays?: Record<string, { start: string; end: string }>;
   startDate: string;
   endDate: string;
   flights: FlightInfo[];
@@ -104,6 +105,8 @@ export interface Trip {
   completedChecklistItems?: string[];
   wantToGoPlaces?: string[];
   displayCurrency?: string;
+  homeCountry?: string;
+  hasUserEdits?: boolean;
   aspectBudgets?: {
     flights?: number;
     accommodation?: number;

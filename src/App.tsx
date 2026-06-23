@@ -21,10 +21,6 @@ const enforceFlightBoundariesClient = (itinerary: any[], flights: any[]): any[] 
   const departFlight = flights.find(f => f.type === "depart");
   const returnFlight = flights.find(f => f.type === "return");
 
-  const sortedItinerary = [...itinerary].sort((a, b) => a.dayIndex - b.dayIndex);
-  const day1 = sortedItinerary[0];
-  const lastDay = sortedItinerary[sortedItinerary.length - 1];
-
   const parseTimeToMinutes = (timeStr: string): number => {
     if (!timeStr) return 0;
     const firstPart = timeStr.split("-")[0].trim().toLowerCase();
@@ -44,35 +40,48 @@ const enforceFlightBoundariesClient = (itinerary: any[], flights: any[]): any[] 
     return hours * 60 + minutes;
   };
 
-  if (day1 && departFlight && departFlight.arrivalTime) {
-    const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
-      ? departFlight.arrivalTime.split("T")[1] 
-      : departFlight.arrivalTime;
-    
-    const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
-    if (arrivalMin > 0) {
-      day1.activities = day1.activities.filter((act: any) => {
-        if (act.type === "airport" || act.type === "checkin") return true;
-        const actMin = parseTimeToMinutes(act.time);
-        return actMin >= arrivalMin;
-      });
-    }
-  }
+  const sortedItinerary = [...itinerary].sort((a, b) => a.dayIndex - b.dayIndex);
 
-  if (lastDay && returnFlight && returnFlight.departureTime) {
-    const departureTimeStr = returnFlight.departureTime.includes("T") 
-      ? returnFlight.departureTime.split("T")[1] 
-      : returnFlight.departureTime;
-    
-    const departMin = parseTimeToMinutes(departureTimeStr);
-    if (departMin > 0) {
-      lastDay.activities = lastDay.activities.filter((act: any) => {
-        if (act.type === "airport") return true;
-        const actMin = parseTimeToMinutes(act.time);
-        return actMin <= departMin;
-      });
+  sortedItinerary.forEach((day: any) => {
+    const dayDateStr = day.date;
+    if (!dayDateStr) return;
+
+    // 1. Depart Flight Arrival check on matching date
+    if (departFlight && departFlight.arrivalTime) {
+      const flightArrivalDate = departFlight.arrivalTime.substring(0, 10);
+      if (dayDateStr === flightArrivalDate) {
+        const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
+          ? departFlight.arrivalTime.split("T")[1] 
+          : departFlight.arrivalTime;
+        const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
+        if (arrivalMin > 0) {
+          day.activities = day.activities.filter((act: any) => {
+            if (act.type === "airport" || act.type === "checkin" || act.title?.toLowerCase().includes("check-in") || act.title?.toLowerCase().includes("airport")) return true;
+            const actMin = parseTimeToMinutes(act.time);
+            return actMin >= arrivalMin;
+          });
+        }
+      }
     }
-  }
+
+    // 2. Return Flight Departure check on matching date
+    if (returnFlight && returnFlight.departureTime) {
+      const flightReturnDate = returnFlight.departureTime.substring(0, 10);
+      if (dayDateStr === flightReturnDate) {
+        const departureTimeStr = returnFlight.departureTime.includes("T") 
+          ? returnFlight.departureTime.split("T")[1] 
+          : returnFlight.departureTime;
+        const departMin = parseTimeToMinutes(departureTimeStr);
+        if (departMin > 0) {
+          day.activities = day.activities.filter((act: any) => {
+            if (act.type === "airport" || act.title?.toLowerCase().includes("airport")) return true;
+            const actMin = parseTimeToMinutes(act.time);
+            return actMin <= departMin;
+          });
+        }
+      }
+    }
+  });
 
   return sortedItinerary;
 };
@@ -209,6 +218,7 @@ export default function App() {
         budgetStats: completePlan.budgetStats,
         agentsFeedback: completePlan.agentsFeedback,
         usefulLinks: completePlan.usefulLinks,
+        hasUserEdits: false,
       };
 
       const updatedTrips = [finalizedTrip, ...trips];
@@ -291,6 +301,7 @@ export default function App() {
         checklists: updatedPlan.checklists,
         budgetStats: updatedPlan.budgetStats,
         agentsFeedback: updatedPlan.agentsFeedback,
+        hasUserEdits: false,
       };
 
       const updatedTrips = trips.map(t => t.id === selectedTripId ? adjustedTrip : t);
@@ -337,6 +348,20 @@ export default function App() {
     if (!currentUser) return;
     
     let finalTrip = { ...updatedTrip };
+    
+    const originalTrip = trips.find(t => t.id === finalTrip.id);
+    if (originalTrip) {
+      const changedItinerary = JSON.stringify(originalTrip.itinerary) !== JSON.stringify(finalTrip.itinerary);
+      const changedFlights = JSON.stringify(originalTrip.flights) !== JSON.stringify(finalTrip.flights);
+      const changedHotels = JSON.stringify(originalTrip.hotels) !== JSON.stringify(finalTrip.hotels);
+      const changedChecklists = JSON.stringify(originalTrip.checklists) !== JSON.stringify(finalTrip.checklists);
+      if (changedItinerary || changedFlights || changedHotels || changedChecklists) {
+        finalTrip.hasUserEdits = true;
+      }
+    } else {
+      finalTrip.hasUserEdits = true;
+    }
+
     if (finalTrip.itinerary && finalTrip.flights) {
       finalTrip.itinerary = enforceFlightBoundariesClient(finalTrip.itinerary, finalTrip.flights);
     }

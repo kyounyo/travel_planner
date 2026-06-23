@@ -21,7 +21,20 @@ const USD_RATES: Record<string, number> = {
   KRW: 1380.0,
   THB: 36.7,
   IDR: 16400.0,
-  INR: 83.5
+  INR: 83.5,
+  PHP: 58.5,
+  HKD: 7.8,
+  TWD: 32.4,
+  NZD: 1.63,
+  CHF: 0.89,
+  AED: 3.67,
+  SAR: 3.75,
+  ZAR: 18.2,
+  NGN: 1450.0,
+  KES: 130.0,
+  EGP: 47.5,
+  MAD: 10.0,
+  GHS: 14.8
 };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -37,10 +50,106 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   KRW: "₩",
   THB: "฿",
   IDR: "Rp",
-  INR: "₹"
+  INR: "₹",
+  PHP: "₱",
+  HKD: "HK$",
+  TWD: "NT$",
+  NZD: "NZ$",
+  CHF: "CHF",
+  AED: "AED",
+  SAR: "SR",
+  ZAR: "R",
+  NGN: "₦",
+  KES: "KSh",
+  EGP: "E£",
+  MAD: "DH",
+  GHS: "GH₵"
 };
 
-const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR"];
+const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR", "PHP", "HKD", "TWD", "NZD", "CHF", "AED", "SAR", "ZAR", "NGN", "KES", "EGP", "MAD", "GHS"];
+
+const mapCountryToCurrency = (country: string): string => {
+  const norm = (country || "").toLowerCase().trim();
+  if (!norm) return "USD";
+  
+  const mapping: Record<string, string> = {
+    "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
+    "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
+    "malaysia": "MYR", "my": "MYR", "mys": "MYR",
+    "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY", "kyoto": "JPY", "osaka": "JPY",
+    "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
+    "australia": "AUD", "au": "AUD", "aus": "AUD", "sydney": "AUD", "melbourne": "AUD",
+    "canada": "CAD", "ca": "CAD", "can": "CAD", "toronto": "CAD", "vancouver": "CAD",
+    "china": "CNY", "cn": "CNY", "beijing": "CNY", "shanghai": "CNY",
+    "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
+    "thailand": "THB", "th": "THB", "bangkok": "THB", "phuket": "THB",
+    "indonesia": "IDR", "id": "IDR", "jakarta": "IDR", "bali": "IDR",
+    "india": "INR", "in": "INR", "delhi": "INR", "mumbai": "INR",
+    "philippines": "PHP", "philippine": "PHP", "philipines": "PHP", "philiplhine": "PHP", "phlippines": "PHP", "ph": "PHP", "manila": "PHP",
+    "hong kong": "HKD", "hk": "HKD", "hkg": "HKD",
+    "taiwan": "TWD", "tw": "TWD", "taipei": "TWD",
+    "new zealand": "NZD", "nz": "NZD", "auckland": "NZD",
+    "switzerland": "CHF", "ch": "CHF", "swiss": "CHF", "zurich": "CHF",
+    "united arab emirates": "AED", "uae": "AED", "dubai": "AED", "abu dhabi": "AED",
+    "saudi arabia": "SAR", "sa": "SAR", "riyadh": "SAR",
+    "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
+    "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
+    "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
+    "kenya": "KES", "ke": "KES", "nairobi": "KES",
+    "morocco": "MAD", "ma": "MAD", "casablanca": "MAD", "marrakech": "MAD",
+    "ghana": "GHS", "gh": "GHS", "accra": "GHS",
+    "germany": "EUR", "france": "EUR", "italy": "EUR", "spain": "EUR", 
+    "netherlands": "EUR", "belgium": "EUR", "austria": "EUR", "greece": "EUR", 
+    "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "paris": "EUR", "rome": "EUR"
+  };
+
+  if (mapping[norm]) return mapping[norm];
+
+  const words = norm.split(/[\s,./()|-]+/);
+  const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (key.includes(" ")) {
+      if (norm.includes(key)) return mapping[key];
+    } else if (words.includes(key)) {
+      return mapping[key];
+    }
+  }
+
+  if (norm.includes("phil") || norm.includes("phli") || norm.includes("manila") || norm.includes("philipp")) {
+    return "PHP";
+  }
+  if (norm.includes("sing") || norm.includes("merlion")) {
+    return "SGD";
+  }
+  if (norm.includes("tokyo") || norm.includes("japan") || norm.includes("nrt") || norm.includes("hnd")) {
+    return "JPY";
+  }
+
+  return "USD";
+};
+
+const formatShortDate = (dateStr?: string): string => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+  } catch (_) {}
+  return dateStr;
+};
+
+const getPreferredMode = (activity: any): "transit" | "driving" | "walking" => {
+  if (activity.preferredTransportMode) {
+    return activity.preferredTransportMode;
+  }
+  if (activity.transportation && activity.transportation.mode) {
+    const m = activity.transportation.mode.toLowerCase();
+    if (m.includes("walk") || m.includes("foot")) return "walking";
+    if (m.includes("taxi") || m.includes("car") || m.includes("drive") || m.includes("uber") || m.includes("grab")) return "driving";
+  }
+  return "transit";
+};
 
 const getActivityLabel = (activity: Activity, trip: Trip): "Want-to-go" | "Flight" | "Hotel" | "AI suggested" => {
   if (activity.label) {
@@ -163,7 +272,7 @@ const categorizeActivityTime = (timeStr: string): "Morning" | "Afternoon" | "Eve
   return "Morning";
 };
 
-const getSlotActivities = (day: DayItinerary | undefined, slot: "Morning" | "Afternoon" | "Evening"): Activity[] => {
+const getSlotActivities = (day: DayItinerary | undefined, slot: "Morning" | "Afternoon" | "Evening", trip?: Trip): Activity[] => {
   if (!day) return [];
   
   // Filter activities that match this category
@@ -173,41 +282,244 @@ const getSlotActivities = (day: DayItinerary | undefined, slot: "Morning" | "Aft
     return filtered;
   }
   
-  // If empty, return a dynamic mock/suggested activity to satisfy "all of these placeholders have one or more than one activities"!
-  const defaultActivities = {
-    Morning: {
-      id: `placeholder_morning_${day.dayIndex}`,
-      time: "08:30 AM",
-      title: "Morning Coffee & Local Walk",
-      description: "Enjoy a fresh cup of coffee and explore nearby bakeries, parks, and quiet local streets.",
-      type: "sightseeing",
-      location: day.activities[0]?.location || "City Center",
-      label: "AI suggested",
-      openingHours: "Open all day"
-    },
-    Afternoon: {
-      id: `placeholder_afternoon_${day.dayIndex}`,
-      time: "02:00 PM",
-      title: "Afternoon Cultural Discovery",
-      description: "Take a stroll around local streets, visit nearby museums, galleries, or enjoy a traditional local lunch.",
-      type: "leisure",
-      location: day.activities[0]?.location || "City Center",
-      label: "AI suggested",
-      openingHours: "Open all day"
-    },
-    Evening: {
-      id: `placeholder_evening_${day.dayIndex}`,
-      time: "07:00 PM",
-      title: "Evening Dinner & Night Walk",
-      description: "Savor local specialties at a cozy dining spot and take in the city skyline under the glowing stars.",
-      type: "food",
-      location: day.activities[0]?.location || "City Center",
-      label: "AI suggested",
-      openingHours: "Open late"
-    }
+  // Cleanly identify the main destination
+  let destination = "the city";
+  if (trip && trip.destinations && trip.destinations.length > 0) {
+    destination = trip.destinations[0];
+  } else if (day.activities && day.activities[0] && day.activities[0].location) {
+    destination = day.activities[0].location;
+  }
+
+  const destLower = destination.toLowerCase();
+
+  // Create a stunning curated list of highly specific placeholders matching popular travel destinations
+  interface CuratedSlot {
+    title: string;
+    description: string;
+    location: string;
+    type: string;
+    openingHours: string;
+    budgetRange: string;
+  }
+
+  let selected: CuratedSlot;
+
+  if (destLower.includes("tokyo")) {
+    const spots = {
+      Morning: {
+        title: "Tsukiji Outer Market Culinary Stroll",
+        description: "Savor fresh-rolled tamagoyaki egg skewers, fresh sashimi, and matcha lattes from local vendors.",
+        location: "Tsukiji Outer Market, Tokyo",
+        type: "food",
+        openingHours: "05:00 AM - 02:00 PM",
+        budgetRange: "¥500 - ¥2,500"
+      },
+      Afternoon: {
+        title: "Meiji Jingu Shrine & Harajuku Discovery",
+        description: "Stroll through the towering cedar forest of Tokyo's grandest shrine, followed by exploring the fashion alleys of Takeshita Street.",
+        location: "Meiji Jingu Shrine, Tokyo",
+        type: "culture",
+        openingHours: "09:00 AM - 05:00 PM",
+        budgetRange: "Free"
+      },
+      Evening: {
+        title: "Shibuya Crossing & Shibuya Sky Sunset View",
+        description: "Witness the legendary Shibuya crowd wave from above and snap 360-degree sunset skyline photos on the open-air deck.",
+        location: "Shibuya Sky, Tokyo",
+        type: "leisure",
+        openingHours: "10:00 AM - 10:30 PM",
+        budgetRange: "¥2,200"
+      }
+    };
+    selected = spots[slot];
+  } else if (destLower.includes("singapore")) {
+    const spots = {
+      Morning: {
+        title: "Marina Bay Waterfront Stroll & Kaya Toast",
+        description: "Enjoy traditional butter and kaya toast at Ya Kun, then take a refreshing walk along the breezy Marina Boardwalk.",
+        location: "Marina Bay Sands Promenade, Singapore",
+        type: "food",
+        openingHours: "07:30 AM - 10:00 PM",
+        budgetRange: "S$5 - S$12"
+      },
+      Afternoon: {
+        title: "Gardens by the Bay Conservatories",
+        description: "Explore the mist-filled Cloud Forest mountain and the majestic Flower Dome inside these state-of-the-art climate conservatories.",
+        location: "Gardens by the Bay, Singapore",
+        type: "leisure",
+        openingHours: "09:00 AM - 09:00 PM",
+        budgetRange: "S$28 - S$53"
+      },
+      Evening: {
+        title: "Lau Pa Sat Hawker Feast & Satay Streets",
+        description: "Dine under historic Victorian cast-iron frames. Savor freshly grilled satay skewers with peanut sauce and cold local Tiger beer.",
+        location: "Lau Pa Sat, Singapore",
+        type: "food",
+        openingHours: "Open 24 hours",
+        budgetRange: "S$10 - S$30"
+      }
+    };
+    selected = spots[slot];
+  } else if (destLower.includes("kuala lumpur") || destLower.includes("kl")) {
+    const spots = {
+      Morning: {
+        title: "Breakfast & Brews at VCR Cafe",
+        description: "Sip custom pour-overs and sample gourmet avocado toasts inside a charming, restored mid-century building.",
+        location: "VCR Galloway, Kuala Lumpur",
+        type: "food",
+        openingHours: "08:30 AM - 05:00 PM",
+        budgetRange: "RM15 - RM40"
+      },
+      Afternoon: {
+        title: "Petronas Twin Towers Skybridge Visit",
+        description: "Walk the double-decker connection on the 41st floor and view the bustling city center from 170 meters high.",
+        location: "Petronas Twin Towers, Kuala Lumpur",
+        type: "leisure",
+        openingHours: "09:00 AM - 09:00 PM",
+        budgetRange: "RM35 - RM80"
+      },
+      Evening: {
+        title: "Street Food Feast at Jalan Alor Night Market",
+        description: "Immerse in the neon-hued food lane. Try charcoal-grilled chicken wings, oyster omelets, and dim sum from bustling roadside stalls.",
+        location: "Jalan Alor, Kuala Lumpur",
+        type: "food",
+        openingHours: "05:00 PM - 03:00 AM",
+        budgetRange: "RM10 - RM35"
+      }
+    };
+    selected = spots[slot];
+  } else if (destLower.includes("london")) {
+    const spots = {
+      Morning: {
+        title: "Specialty Coffee at Monmouth Coffee, Borough Market",
+        description: "Start with some of London's legendary drip coffee paired with artisan morning pastries inside the historic food market.",
+        location: "Borough Market, London",
+        type: "food",
+        openingHours: "08:00 AM - 05:00 PM",
+        budgetRange: "£4 - £12"
+      },
+      Afternoon: {
+        title: "British Museum Highlights Tour",
+        description: "View world-treasured archaeological wonders including the Rosetta Stone and the Parthenon Sculptures under the iconic Great Court roof.",
+        location: "British Museum, London",
+        type: "culture",
+        openingHours: "10:00 AM - 05:00 PM",
+        budgetRange: "Free (Donation suggested)"
+      },
+      Evening: {
+        title: "West End Theatre District Walk & Soho Dinner",
+        description: "Soak in the glowing theater signs of Piccadilly Circus and enjoy a comforting dinner at a highly-rated Soho bistro.",
+        location: "Soho, London",
+        type: "food",
+        openingHours: "Open late",
+        budgetRange: "£15 - £40"
+      }
+    };
+    selected = spots[slot];
+  } else if (destLower.includes("paris")) {
+    const spots = {
+      Morning: {
+        title: "Croissant Tasting at Du Pain et des Idées",
+        description: "Sample Paris's most acclaimed escargot pastries and warm butter croissants along the beautiful Saint-Martin canal.",
+        location: "Du Pain et des Idées, Paris",
+        type: "food",
+        openingHours: "07:00 AM - 07:30 PM",
+        budgetRange: "€3 - €10"
+      },
+      Afternoon: {
+        title: "Louvre Museum Architectural Garden Walk",
+        description: "View the magnificent glass pyramids, stroll down Tuileries Garden, and discover boutique Parisian galleries nearby.",
+        location: "Louvre Museum, Paris",
+        type: "leisure",
+        openingHours: "09:00 AM - 06:00 PM",
+        budgetRange: "Free - €22"
+      },
+      Evening: {
+        title: "Scenic Seine River Cruise & Eiffel Tower Twilight",
+        description: "Sail down the river as historical monuments light up in a warm glow, then watch the Eiffel Tower sparkle on the hour.",
+        location: "Eiffel Tower, Paris",
+        type: "sightseeing",
+        openingHours: "09:30 AM - 11:45 PM",
+        budgetRange: "€15 - €30"
+      }
+    };
+    selected = spots[slot];
+  } else if (destLower.includes("new york") || destLower.includes("nyc")) {
+    const spots = {
+      Morning: {
+        title: "Artisan Bagels at Ess-a-Bagel",
+        description: "Sink your teeth into a giant, hand-rolled NY bagel loaded with gourmet cream cheese spreads and classic smoked salmon.",
+        location: "Ess-a-Bagel, New York",
+        type: "food",
+        openingHours: "06:00 AM - 05:00 PM",
+        budgetRange: "$6 - $20"
+      },
+      Afternoon: {
+        title: "The High Line Elevated Garden Walk",
+        description: "Stroll along this beautifully landscaped 1.45-mile park built on an old freight rail line, overlooking Chelsea galleries.",
+        location: "The High Line, New York",
+        type: "leisure",
+        openingHours: "07:00 AM - 10:00 PM",
+        budgetRange: "Free"
+      },
+      Evening: {
+        title: "Times Square & Broadway Theatre Walk",
+        description: "Be dazzled by the canyon of neon billboards, feel the high-voltage Manhattan energy, and grab dinner in Hell's Kitchen.",
+        location: "Times Square, New York",
+        type: "sightseeing",
+        openingHours: "Open all hours",
+        budgetRange: "$15 - $45"
+      }
+    };
+    selected = spots[slot];
+  } else {
+    // Elegant fallback dynamically adapted to any generic destination name requested
+    const spots = {
+      Morning: {
+        title: `Scenic Morning Heritage Discovery in ${destination}`,
+        description: `Explore charming local squares and historical alleys. Discover artisan boutiques and sip on locally brewed coffee.`,
+        location: `${destination} City Center`,
+        type: "sightseeing",
+        openingHours: "Open daily",
+        budgetRange: "Free"
+      },
+      Afternoon: {
+        title: `Artisanal Shopping & Tasting at ${destination} Markets`,
+        description: `Immerse yourself in native street handicrafts, souvenirs, and try delicious gourmet specialities popular in the region.`,
+        location: `${destination} Central Market`,
+        type: "shopping",
+        openingHours: "09:00 AM - 06:00 PM",
+        budgetRange: "Leisurely"
+      },
+      Evening: {
+        title: `Sunset Skyline & Food Walking Tour in ${destination}`,
+        description: `Stroll down the popular waterfront promenade, take photos of monumental landmarks under golden twilight, and dine in a loved local restaurant.`,
+        location: `${destination} Waterfront`,
+        type: "food",
+        openingHours: "Open late",
+        budgetRange: "Curated"
+      }
+    };
+    selected = spots[slot];
+  }
+
+  const times = {
+    Morning: "08:30 AM",
+    Afternoon: "02:00 PM",
+    Evening: "07:00 PM"
   };
-  
-  return [defaultActivities[slot]];
+
+  return [{
+    id: `placeholder_${slot.toLowerCase()}_${day.dayIndex}`,
+    time: times[slot],
+    title: selected.title,
+    description: selected.description,
+    location: selected.location,
+    type: selected.type,
+    openingHours: selected.openingHours,
+    budgetRange: selected.budgetRange,
+    label: "AI suggested"
+  }];
 };
 
 const isPeriodHiddenByFlight = (day: DayItinerary | undefined, period: "Morning" | "Afternoon" | "Evening", trip: Trip): boolean => {
@@ -260,18 +572,56 @@ const convertAmount = (amount: number, from: string, to: string): number => {
 
 const convertPriceString = (text: string | undefined, base: string = "USD", target: string = "USD"): string => {
   if (!text) return "N/A";
-  const cleanBase = (base || "USD").toUpperCase();
   const cleanTarget = (target || "USD").toUpperCase();
-  if (cleanBase === cleanTarget) return text;
+
+  const SYMBOL_TO_CURRENCY: Record<string, string> = {
+    "$": "USD",
+    "€": "EUR",
+    "£": "GBP",
+    "¥": "JPY",
+    "S$": "SGD",
+    "RM": "MYR",
+    "₩": "KRW",
+    "฿": "THB",
+    "RP": "IDR",
+    "₹": "INR",
+    "HK$": "HKD",
+    "NT$": "TWD",
+    "NZ$": "NZD",
+    "CHF": "CHF",
+    "AED": "AED",
+    "SAR": "SAR",
+    "ZAR": "ZAR",
+    "NGN": "NGN",
+    "KES": "KES",
+    "EGP": "EGP",
+    "MAD": "MAD",
+    "GHS": "GHS",
+  };
 
   try {
-    const regex = /(?:[\$¥€£₩฿₹]|S\$|RM|Rp|RMB)\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/gi;
+    const regex = /(?:([A-Z]{3})|([\$¥€£₩฿₹]|S\$|RM|Rp|RMB))\s*([\d,]+(?:\.\d+)?)/gi;
     let hasMatches = false;
-    const replaced = text.replace(regex, (match, p1) => {
+    const replaced = text.replace(regex, (match, wordIso, symbolChar, p1) => {
       hasMatches = true;
       const num = parseFloat(p1.replace(/,/g, ""));
       if (!isNaN(num)) {
-        const conv = convertAmount(num, cleanBase, cleanTarget);
+        let sourceCurr = (base || "USD").toUpperCase();
+        if (wordIso) {
+          sourceCurr = wordIso.toUpperCase();
+        } else if (symbolChar) {
+          const symClean = symbolChar.trim().toUpperCase();
+          if (SYMBOL_TO_CURRENCY[symClean]) {
+            sourceCurr = SYMBOL_TO_CURRENCY[symClean];
+          }
+        }
+
+        if (sourceCurr === cleanTarget) {
+          const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
+          return `${targetSymbol}${num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        }
+
+        const conv = convertAmount(num, sourceCurr, cleanTarget);
         const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
         return `${targetSymbol}${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
       }
@@ -285,7 +635,7 @@ const convertPriceString = (text: string | undefined, base: string = "USD", targ
 
   const pureNum = parseFloat(text.replace(/[^0-9.]/g, ""));
   if (!isNaN(pureNum) && /^\d+$/.test(text.trim().replace(/,/g, ""))) {
-    const conv = convertAmount(pureNum, cleanBase, cleanTarget);
+    const conv = convertAmount(pureNum, base, cleanTarget);
     const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
     return `${targetSymbol}${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }
@@ -531,7 +881,108 @@ export default function ItineraryDisplay({
   const baseCurrency = trip.budgetStats?.currency || "USD";
   const displayCurrency = trip.displayCurrency || baseCurrency;
 
+  const homeCurr = mapCountryToCurrency(trip.homeCountry || "");
+  const travelCurrs = Array.from(new Set([
+    mapCountryToCurrency(trip.destinationName),
+    ...(trip.destinations || []).map(d => mapCountryToCurrency(d))
+  ])).filter(c => c !== homeCurr);
+  const remainingCurrs = AVAILABLE_CURRENCIES.filter(c => c !== homeCurr && !travelCurrs.includes(c));
+
   const activeDay = trip.itinerary?.find(d => d.dayIndex === activeDayIdx) || trip.itinerary?.[0];
+
+  const getActiveDayDestination = (dayDate: string | undefined): string => {
+    if (!dayDate) return trip.destinations?.[0] || trip.destinationName || "";
+    if (trip.destinationStays) {
+      for (const [destName, range] of Object.entries(trip.destinationStays)) {
+        if (dayDate >= range.start && dayDate <= range.end) {
+          return destName;
+        }
+      }
+    }
+    const daysCount = trip.itinerary ? trip.itinerary.length : 0;
+    if (daysCount > 0 && trip.itinerary && trip.destinations && trip.destinations.length > 0) {
+      const activeIdx = trip.itinerary.findIndex(d => d.date === dayDate);
+      if (activeIdx !== -1) {
+        const destCount = trip.destinations.length;
+        const daysPerDest = Math.ceil(daysCount / destCount);
+        const destIdx = Math.min(Math.floor(activeIdx / daysPerDest), destCount - 1);
+        return trip.destinations[destIdx];
+      }
+    }
+    return trip.destinations?.[0] || trip.destinationName || "";
+  };
+
+  const activeDayDestination = getActiveDayDestination(activeDay?.date);
+  const activeDayCurrency = mapCountryToCurrency(activeDayDestination);
+
+  const getDestinationTimelines = () => {
+    const timelines: Array<{ destination: string; dateRange: string; hotelName?: string }> = [];
+    if (trip.hotels && trip.hotels.length > 0) {
+      trip.hotels.forEach((hotel, idx) => {
+        const checkInDate = hotel.checkIn ? hotel.checkIn.split("T")[0] : "";
+        const checkOutDate = hotel.checkOut ? hotel.checkOut.split("T")[0] : "";
+
+        let matchedDest = "";
+
+        // 1. Try matching by stay dates in the traveler stays
+        if (checkInDate && trip.destinationStays) {
+          for (const [destName, stayRange] of Object.entries(trip.destinationStays)) {
+            if (checkInDate >= stayRange.start && checkInDate <= stayRange.end) {
+              matchedDest = destName;
+              break;
+            }
+          }
+        }
+
+        // 2. Try fuzzy string matching of location name
+        if (!matchedDest && trip.destinations) {
+          const searchIn = `${hotel.name} ${hotel.locationUrl}`.toLowerCase();
+          for (const destName of trip.destinations) {
+            const normDest = destName.toLowerCase();
+            if (searchIn.includes(normDest) || normDest.includes(searchIn)) {
+              matchedDest = destName;
+              break;
+            }
+          }
+        }
+
+        const dest = matchedDest || trip.destinations[idx] || hotel.locationUrl || trip.destinations[0] || "Destination";
+
+        let formattedRange = "";
+        if (checkInDate && checkOutDate) {
+          formattedRange = `${formatShortDate(checkInDate)} — ${formatShortDate(checkOutDate)}`;
+        } else {
+          formattedRange = `Stay Period`;
+        }
+        timelines.push({
+          destination: dest,
+          dateRange: formattedRange,
+          hotelName: hotel.name
+        });
+      });
+    } else if (trip.destinations && trip.destinations.length > 1) {
+      const daysCount = trip.itinerary ? trip.itinerary.length : 0;
+      if (daysCount > 0 && trip.itinerary) {
+        const destCount = trip.destinations.length;
+        const daysPerDest = Math.ceil(daysCount / destCount);
+        trip.destinations.forEach((dest, idx) => {
+          const startDayIdx = idx * daysPerDest;
+          const endDayIdx = Math.min((idx + 1) * daysPerDest - 1, daysCount - 1);
+          if (startDayIdx < daysCount) {
+            const startDayObj = trip.itinerary![startDayIdx];
+            const endDayObj = trip.itinerary![endDayIdx];
+            const startFormatted = startDayObj.date ? formatShortDate(startDayObj.date) : `Day ${startDayObj.dayIndex}`;
+            const endFormatted = endDayObj.date ? formatShortDate(endDayObj.date) : `Day ${endDayObj.dayIndex}`;
+            timelines.push({
+              destination: dest,
+              dateRange: `${startFormatted} — ${endFormatted}`,
+            });
+          }
+        });
+      }
+    }
+    return timelines;
+  };
 
   // Travel Feasibility and Time conflicts warnings state
   const [travelWarnings, setTravelWarnings] = useState<{ prevActivityId: string; curActivityId: string; message: string; isImpossible?: boolean }[]>([]);
@@ -579,7 +1030,7 @@ export default function ItineraryDisplay({
     return () => clearTimeout(timer);
   }, [
     activeDayIdx, 
-    activeDay?.activities?.map(a => `${a.id}_${a.time}_${a.location}_${a.preferredTransportMode || "transit"}`).join("|")
+    activeDay?.activities?.map(a => `${a.id}_${a.time}_${a.location}_${getPreferredMode(a)}`).join("|")
   ]);
 
   const fetchAlternativesForActivity = async (activity: Activity, forceNext = false) => {
@@ -634,28 +1085,85 @@ export default function ItineraryDisplay({
   const handleSwapActivity = (originalActivityId: string, alternateChoice: any) => {
     if (!trip.itinerary) return;
 
-    const updatedItinerary = trip.itinerary.map(day => {
-      if (day.dayIndex !== activeDayIdx) return day;
-      return {
-        ...day,
-        activities: day.activities.map(act => {
-          if (act.id === originalActivityId) {
-            return {
-              ...act,
-              title: alternateChoice.title,
-              description: alternateChoice.description,
-              location: alternateChoice.location,
-              type: alternateChoice.type || act.type,
-              openingHours: alternateChoice.openingHours || act.openingHours,
-              budgetRange: alternateChoice.budgetRange || act.budgetRange,
-              transportation: alternateChoice.transportation || act.transportation,
-              label: "AI suggested"
-            };
-          }
-          return act;
-        })
-      };
-    });
+    let updatedItinerary;
+    const isPlaceholder = originalActivityId.startsWith("placeholder_");
+
+    if (isPlaceholder) {
+      updatedItinerary = trip.itinerary.map(day => {
+        if (day.dayIndex !== activeDayIdx) return day;
+
+        const newAct: Activity = {
+          id: "act_" + Date.now(),
+          title: alternateChoice.title,
+          time: alternateChoice.time || (originalActivityId.includes("morning") ? "08:30 AM" : originalActivityId.includes("afternoon") ? "02:00 PM" : "07:00 PM"),
+          description: alternateChoice.description,
+          location: alternateChoice.location,
+          type: alternateChoice.type || (originalActivityId.includes("morning") ? "sightseeing" : originalActivityId.includes("afternoon") ? "leisure" : "food"),
+          openingHours: alternateChoice.openingHours || "Open all day",
+          budgetRange: alternateChoice.budgetRange || "Free",
+          transportation: alternateChoice.transportation || {
+            mode: "Walking",
+            duration: "10 mins",
+            distance: "0.5 km",
+            details: "Walk to venue"
+          },
+          label: "AI suggested"
+        };
+
+        const nextActivities = [...day.activities, newAct];
+        
+        // Sort chronologically by time so it goes to the correct position
+        const getMinutes = (timeStr: string): number => {
+          try {
+            const match = timeStr.trim().toLowerCase().match(/(\d+)(?::(\d+))?\s*(am|pm)?/);
+            if (match) {
+              let hours = parseInt(match[1], 10);
+              const minutes = match[2] ? parseInt(match[2], 10) : 0;
+              const ampm = match[3];
+              if (ampm === "pm" && hours < 12) hours += 12;
+              if (ampm === "am" && hours === 12) hours = 0;
+              return hours * 60 + minutes;
+            }
+          } catch (_) {}
+          return 0;
+        };
+        nextActivities.sort((a,b) => getMinutes(a.time) - getMinutes(b.time));
+
+        return {
+          ...day,
+          activities: nextActivities
+        };
+      });
+
+      // Recalculate transit for the day so commute matches up perfectly with adjacent real items
+      const targetDay = updatedItinerary.find(d => d.dayIndex === activeDayIdx);
+      if (targetDay) {
+        recalculateAndSaveTransitForDay(targetDay.activities, activeDayIdx);
+      }
+    } else {
+      updatedItinerary = trip.itinerary.map(day => {
+        if (day.dayIndex !== activeDayIdx) return day;
+        return {
+          ...day,
+          activities: day.activities.map(act => {
+            if (act.id === originalActivityId) {
+              return {
+                ...act,
+                title: alternateChoice.title,
+                description: alternateChoice.description,
+                location: alternateChoice.location,
+                type: alternateChoice.type || act.type,
+                openingHours: alternateChoice.openingHours || act.openingHours,
+                budgetRange: alternateChoice.budgetRange || act.budgetRange,
+                transportation: alternateChoice.transportation || act.transportation,
+                label: "AI suggested"
+              };
+            }
+            return act;
+          })
+        };
+      });
+    }
 
     onUpdateTrip({
       ...trip,
@@ -1361,61 +1869,54 @@ export default function ItineraryDisplay({
       {/* LEFT: Complete Timeline Flow (8 Cols) */}
       <div className="lg:col-span-8 space-y-8">
         
-        {/* Day Selector Ribbon */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            {trip.itinerary?.map((day) => (
-              <button
-                key={day.dayIndex}
-                onClick={() => {
-                  setActiveDayIdx(day.dayIndex);
-                  if (day.activities.length > 0) {
-                    setFocusedLocation(day.activities[0].location);
-                  }
-                }}
-                className={`px-4 py-2 text-xs font-bold rounded-xl tracking-widest transition uppercase shrink-0 cursor-pointer ${
-                  activeDayIdx === day.dayIndex
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-slate-50 text-slate-500 hover:bg-slate-100/80 hover:text-slate-900"
-                }`}
-              >
-                Day {day.dayIndex}
-              </button>
-            ))}
-          </div>
+        {/* Multi-destination staying plan banner */}
+        {trip.destinations && trip.destinations.length > 1 && (() => {
+          const timelines = getDestinationTimelines();
+          return (
+            <div className="bg-gradient-to-br from-indigo-50/40 via-white to-slate-50/40 border border-slate-200 rounded-3xl p-5 shadow-xs">
+              <h4 className="text-xs font-mono font-bold text-slate-500 uppercase tracking-widest mb-3.5 flex items-center gap-2">
+                <span>📍 Multi-Place Route Map & Stay Timeline</span>
+                <span className="h-px bg-slate-100 flex-1"></span>
+              </h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {timelines.map((item, index) => (
+                  <div key={index} className="relative bg-white border border-slate-150 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-indigo-200 hover:shadow-2xs group">
+                    <div className="absolute top-0 right-0 p-3 text-[10px] font-mono font-extrabold text-indigo-600 bg-indigo-50/50 rounded-tr-2xl rounded-bl-xl group-hover:bg-indigo-50/80 leading-none">
+                      Stop {index + 1}
+                    </div>
+                    
+                    <div>
+                      <div className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                        Location / Area
+                      </div>
+                      <h5 className="text-sm font-black text-slate-900 mt-1 flex items-center gap-1.5">
+                        <span className="text-base text-indigo-500">🗺️</span>
+                        {item.destination}
+                      </h5>
+                      <span className="inline-block mt-2 bg-indigo-600 font-extrabold text-[10px] font-mono px-2.5 py-1 rounded-lg text-white shadow-3xs">
+                        📅 {item.dateRange}
+                      </span>
+                    </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Display Currency selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Currency:</span>
-              <select
-                value={displayCurrency}
-                onChange={(e) => {
-                  onUpdateTrip({
-                    ...trip,
-                    displayCurrency: e.target.value
-                  });
-                }}
-                className="bg-transparent text-slate-800 font-bold font-mono text-xs focus:outline-none cursor-pointer"
-              >
-                {AVAILABLE_CURRENCIES.map(curr => (
-                  <option key={curr} value={curr}>{curr} ({CURRENCY_SYMBOLS[curr] || "$"})</option>
+                    {item.hotelName && (
+                      <div className="mt-4 pt-3.5 border-t border-slate-100">
+                        <div className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Staying at:</div>
+                        <p className="text-xs font-extrabold text-slate-800 mt-1 truncate flex items-center gap-1" title={item.hotelName}>
+                          <span className="text-sm">🏨</span>
+                          {item.hotelName}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
-
-            <button
-              onClick={onExportCalendar}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-indigo-600/10"
-              title="Export calendar schedule ICS"
-            >
-              <Download className="w-3.5 h-3.5 text-indigo-200" /> Export Schedule
-            </button>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* SCHEDULE FLIGHT DATE/TIME BOUNDARY VALIDATOR BANNER */}
-        {activeConflicts.length > 0 ? (
+        {trip.hasUserEdits && activeConflicts.length > 0 ? (
           <div className="p-5 bg-amber-50/70 border border-amber-200/80 rounded-3xl space-y-3.5 shadow-sm text-slate-800 animate-fade-in animate-duration-300">
             <div className="flex items-start gap-2.5">
               <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -1518,12 +2019,88 @@ export default function ItineraryDisplay({
           )}
         </div>
 
+        {/* Day Selector Ribbon */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-4.5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
+            {trip.itinerary?.map((day) => (
+              <button
+                key={day.dayIndex}
+                onClick={() => {
+                  setActiveDayIdx(day.dayIndex);
+                  if (day.activities.length > 0) {
+                    setFocusedLocation(day.activities[0].location);
+                  }
+                }}
+                className={`py-1.5 px-3.5 rounded-2xl transition-all font-sans flex flex-col items-center justify-center text-center shrink-0 cursor-pointer min-w-[72px] border ${
+                  activeDayIdx === day.dayIndex
+                    ? "bg-slate-950 border-slate-950 text-white shadow-sm font-bold scale-[1.02]"
+                    : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100/80 hover:text-slate-900 hover:border-slate-200"
+                }`}
+              >
+                <span className="text-[11px] font-black uppercase tracking-wider">Day {day.dayIndex}</span>
+                {day.date && (
+                  <span className={`text-[9px] font-semibold font-mono tracking-normal mt-0.5 ${
+                    activeDayIdx === day.dayIndex ? "text-indigo-200 animate-fade-in" : "text-slate-450 text-slate-400"
+                  }`}>
+                    {formatShortDate(day.date)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Display Currency selector */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Currency:</span>
+              <select
+                value={displayCurrency}
+                onChange={(e) => {
+                  onUpdateTrip({
+                    ...trip,
+                    displayCurrency: e.target.value
+                  });
+                }}
+                className="bg-transparent text-slate-800 font-bold font-mono text-xs focus:outline-none cursor-pointer border-none"
+              >
+                <optgroup label="🏡 Home Country Currency">
+                  <option value={homeCurr}>
+                    {homeCurr} ({CURRENCY_SYMBOLS[homeCurr] || "$"}) - Home
+                  </option>
+                </optgroup>
+                {travelCurrs.length > 0 && (
+                  <optgroup label="✈️ Travel Destination Currency">
+                    {travelCurrs.map(curr => (
+                      <option key={curr} value={curr}>
+                        {curr} ({CURRENCY_SYMBOLS[curr] || "$"}) - Destination
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="🌐 All Other Currencies">
+                  {remainingCurrs.map(curr => (
+                    <option key={curr} value={curr}>{curr} ({CURRENCY_SYMBOLS[curr] || "$"})</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+
+            <button
+              onClick={onExportCalendar}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-indigo-600/10"
+              title="Export calendar schedule ICS"
+            >
+              <Download className="w-3.5 h-3.5 text-indigo-200" /> Export Schedule
+            </button>
+          </div>
+        </div>
+
         {/* ACTIVE TIMELINE STREAM */}
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
           <div className="mb-6 pb-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="text-xs font-mono font-bold text-indigo-600 uppercase tracking-widest block">
-                Day {activeDay?.dayIndex} — {activeDay?.date}
+                Day {activeDay?.dayIndex} — {activeDay?.date ? formatShortDate(activeDay.date) : ""}
               </span>
               <h3 className="text-lg font-bold tracking-tight text-slate-900 mt-0.5">
                 {activeDay?.theme}
@@ -1539,7 +2116,7 @@ export default function ItineraryDisplay({
           <div className="relative pl-6 border-l border-slate-100 ml-4 pt-2 space-y-10">
             {(["Morning", "Afternoon", "Evening"] as const).map((period) => {
               if (isPeriodHiddenByFlight(activeDay, period, trip)) return null;
-              const periodActivities = getSlotActivities(activeDay, period);
+              const periodActivities = getSlotActivities(activeDay, period, trip);
 
               return (
                 <div key={period} className="space-y-4">
@@ -1747,7 +2324,7 @@ export default function ItineraryDisplay({
                             {activity.budgetRange && (
                               <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-0.5">
                                 <DollarSign className="w-3 h-3" />
-                                {convertPriceString(activity.budgetRange, baseCurrency, displayCurrency)}
+                                {convertPriceString(activity.budgetRange, activeDayCurrency, displayCurrency)}
                               </span>
                             )}
                           </div>
@@ -1943,7 +2520,7 @@ export default function ItineraryDisplay({
                         <div className="mt-4 pt-4 border-t border-slate-100/80">
 
                           {/* Transit options bar underneath if applicable */}
-                          {activity.transportation && (() => {
+                          {(() => {
                             const idx = activeDay?.activities?.findIndex(a => a.id === activity.id) ?? -1;
                             const isArrivalStart = idx === 0 && (
                               activity.type === "airport" ||
@@ -1954,6 +2531,10 @@ export default function ItineraryDisplay({
                               (activity.location || "").toLowerCase().includes("airport")
                             );
                             if (isArrivalStart) return null;
+
+                            const origin = getOriginLocationForActivity(activity.id);
+                            const isSamePlace = origin && activity.location && (origin.trim().toLowerCase() === activity.location.trim().toLowerCase());
+                            if (isSamePlace) return null;
 
                             const { from, to } = getTransitPointsForActivity(activity.id);
                             return (
@@ -1970,32 +2551,35 @@ export default function ItineraryDisplay({
                                   {/* Left: Commute Mode info/pill */}
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <Navigation className="w-3.5 h-3.5 text-indigo-500" strokeWidth={2.5} />
-                                    <span className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Commute:</span>
-                                    {updatingTransitIds[activity.id] ? (
-                                      <span className="animate-pulse text-indigo-650 font-bold flex items-center gap-1">
-                                        <span className="w-2.5 h-2.5 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin inline-block"></span>
-                                        Recalculating commute...
+                                    {!activity.preferredTransportMode ? (
+                                      <span className="text-[11px] font-extrabold text-amber-650 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg">
+                                        (select transportation method)
                                       </span>
                                     ) : (
                                       <>
-                                        <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold" title={activity.transportation.details}>
-                                          {activity.transportation.mode}
+                                        {activity.preferredTransportMode === "walking" && (
+                                          <span className="text-[10px] bg-emerald-50 text-emerald-705 px-2 py-0.5 rounded font-extrabold border border-emerald-200">
+                                            🚶 Walkable Route
+                                          </span>
+                                        )}
+                                        <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold" title={activity.transportation?.details}>
+                                          {activity.transportation?.mode || (activity.preferredTransportMode === "walking" ? "Walking" : activity.preferredTransportMode === "driving" ? "Taxi/Car" : "Transit")}
                                         </span>
-                                        <span className="text-slate-400 font-mono font-bold">({activity.transportation.duration || "N/A"})</span>
-                                        {activity.transportation.distance && (
+                                        <span className="text-slate-400 font-mono font-bold">({activity.transportation?.duration || "Tap mode below to calculate"})</span>
+                                        {activity.transportation?.distance && (
                                           <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" title="Est. Geographic Distance">
                                             {activity.transportation.distance}
                                           </span>
                                         )}
-                                        {activity.transportation.cost && (
+                                        {activity.transportation?.cost && (
                                           <span className="text-teal-600 font-bold bg-teal-50/60 px-1.5 py-0.5 rounded">
-                                            {convertPriceString(activity.transportation.cost, baseCurrency, displayCurrency)}
+                                            {convertPriceString(activity.transportation.cost, activeDayCurrency, displayCurrency)}
                                           </span>
                                         )}
                                       </>
                                     )}
                                   </div>
-
+ 
                                   {/* Right: Toggle Button Group */}
                                   <div className="flex items-center gap-1 shrink-0 bg-slate-100 border border-slate-200/60 p-0.5 rounded-lg self-end sm:self-center">
                                     <button
@@ -2003,7 +2587,7 @@ export default function ItineraryDisplay({
                                       onClick={() => handleToggleActivityTransitMode(activity.id, "transit")}
                                       disabled={updatingTransitIds[activity.id]}
                                       className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
-                                        (activity.preferredTransportMode || "transit") === "transit"
+                                        activity.preferredTransportMode === "transit"
                                           ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
                                           : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
                                       }`}
@@ -2019,7 +2603,7 @@ export default function ItineraryDisplay({
                                         activity.preferredTransportMode === "driving"
                                           ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
                                           : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
-                                        }`}
+                                      }`}
                                       title="Calculate commute via driving/taxi/rental car"
                                     >
                                       🚗 Taxi/Car
@@ -2047,7 +2631,7 @@ export default function ItineraryDisplay({
                     )}
                   </div>
  
-                  {travelWarnings
+                  {trip.hasUserEdits && travelWarnings
                     .filter(w => w.prevActivityId === activity.id)
                     .map((w, wIdx) => {
                       const isImp = w.isImpossible;
