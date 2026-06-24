@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Trip, Activity, ActivityRating, DayItinerary } from "../types";
-import { 
-  Calendar, MapPin, Clock, DollarSign, Heart, Star, Navigation, 
+import travelData from "../../travelData.json";
+import {
+  Calendar, MapPin, Clock, DollarSign, Heart, Star, Navigation,
   Download, ArrowRight, Share2, Clipboard, Moon, Hotel, Plane,
   ChevronRight, Compass, Settings, CheckCircle2, ChevronDown, Check,
   ExternalLink, Edit, Trash2, Plus, AlertTriangle, Sparkles, Loader2,
@@ -37,93 +38,59 @@ const USD_RATES: Record<string, number> = {
   GHS: 14.8
 };
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  JPY: "¥",
-  SGD: "S$",
-  AUD: "A$",
-  CAD: "C$",
-  MYR: "RM",
-  CNY: "¥",
-  KRW: "₩",
-  THB: "฿",
-  IDR: "Rp",
-  INR: "₹",
-  PHP: "₱",
-  HKD: "HK$",
-  TWD: "NT$",
-  NZD: "NZ$",
-  CHF: "CHF",
-  AED: "AED",
-  SAR: "SR",
-  ZAR: "R",
-  NGN: "₦",
-  KES: "KSh",
-  EGP: "E£",
-  MAD: "DH",
-  GHS: "GH₵"
+let dynamicRates: Record<string, number> | null = null;
+
+const fetchLiveRates = () => {
+  fetch("https://currency-rates.github.io/rates.json")
+    .then(res => {
+      if (res.ok) return res.json();
+      throw new Error("Rates API error");
+    })
+    .then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        dynamicRates = data;
+      }
+    })
+    .catch(err => {
+      console.warn("Failed to fetch live currency rates, using fallback.", err);
+    });
 };
 
+try {
+  fetchLiveRates();
+} catch (_) { }
+
 const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR", "PHP", "HKD", "TWD", "NZD", "CHF", "AED", "SAR", "ZAR", "NGN", "KES", "EGP", "MAD", "GHS"];
+
+interface TravelCountry {
+  country: string;
+  country_code: string | null;
+  currency_code: string | null;
+  states: string[];
+}
+
+const typedTravelData = travelData as TravelCountry[];
 
 const mapCountryToCurrency = (country: string): string => {
   const norm = (country || "").toLowerCase().trim();
   if (!norm) return "USD";
-  
-  const mapping: Record<string, string> = {
-    "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
-    "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
-    "malaysia": "MYR", "my": "MYR", "mys": "MYR",
-    "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY", "kyoto": "JPY", "osaka": "JPY",
-    "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
-    "australia": "AUD", "au": "AUD", "aus": "AUD", "sydney": "AUD", "melbourne": "AUD",
-    "canada": "CAD", "ca": "CAD", "can": "CAD", "toronto": "CAD", "vancouver": "CAD",
-    "china": "CNY", "cn": "CNY", "beijing": "CNY", "shanghai": "CNY",
-    "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
-    "thailand": "THB", "th": "THB", "bangkok": "THB", "phuket": "THB",
-    "indonesia": "IDR", "id": "IDR", "jakarta": "IDR", "bali": "IDR",
-    "india": "INR", "in": "INR", "delhi": "INR", "mumbai": "INR",
-    "philippines": "PHP", "philippine": "PHP", "philipines": "PHP", "philiplhine": "PHP", "phlippines": "PHP", "ph": "PHP", "manila": "PHP",
-    "hong kong": "HKD", "hk": "HKD", "hkg": "HKD",
-    "taiwan": "TWD", "tw": "TWD", "taipei": "TWD",
-    "new zealand": "NZD", "nz": "NZD", "auckland": "NZD",
-    "switzerland": "CHF", "ch": "CHF", "swiss": "CHF", "zurich": "CHF",
-    "united arab emirates": "AED", "uae": "AED", "dubai": "AED", "abu dhabi": "AED",
-    "saudi arabia": "SAR", "sa": "SAR", "riyadh": "SAR",
-    "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
-    "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
-    "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
-    "kenya": "KES", "ke": "KES", "nairobi": "KES",
-    "morocco": "MAD", "ma": "MAD", "casablanca": "MAD", "marrakech": "MAD",
-    "ghana": "GHS", "gh": "GHS", "accra": "GHS",
-    "germany": "EUR", "france": "EUR", "italy": "EUR", "spain": "EUR", 
-    "netherlands": "EUR", "belgium": "EUR", "austria": "EUR", "greece": "EUR", 
-    "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "paris": "EUR", "rome": "EUR"
-  };
 
-  if (mapping[norm]) return mapping[norm];
-
-  const words = norm.split(/[\s,./()|-]+/);
-  const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
-    if (key.includes(" ")) {
-      if (norm.includes(key)) return mapping[key];
-    } else if (words.includes(key)) {
-      return mapping[key];
-    }
+  const match = typedTravelData.find(c => c.country.toLowerCase() === norm);
+  if (match && match.currency_code) {
+    return match.currency_code;
   }
 
-  if (norm.includes("phil") || norm.includes("phli") || norm.includes("manila") || norm.includes("philipp")) {
-    return "PHP";
+  const partialMatch = typedTravelData.find(c =>
+    norm.includes(c.country.toLowerCase()) ||
+    c.country.toLowerCase().includes(norm)
+  );
+  if (partialMatch && partialMatch.currency_code) {
+    return partialMatch.currency_code;
   }
-  if (norm.includes("sing") || norm.includes("merlion")) {
-    return "SGD";
-  }
-  if (norm.includes("tokyo") || norm.includes("japan") || norm.includes("nrt") || norm.includes("hnd")) {
-    return "JPY";
-  }
+
+  if (norm.includes("us") || norm.includes("america") || norm.includes("united states")) return "USD";
+  if (norm.includes("uk") || norm.includes("london") || norm.includes("united kingdom")) return "GBP";
+  if (norm.includes("europe") || norm.includes("france") || norm.includes("germany") || norm.includes("italy")) return "EUR";
 
   return "USD";
 };
@@ -135,7 +102,7 @@ const formatShortDate = (dateStr?: string): string => {
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     }
-  } catch (_) {}
+  } catch (_) { }
   return dateStr;
 };
 
@@ -166,13 +133,13 @@ const getActivityLabel = (activity: Activity, trip: Trip): "Want-to-go" | "Fligh
 
   // Flight classification
   if (
-    typeLower === "airport" || 
-    typeLower === "flight" || 
-    titleLower.includes("flight") || 
-    titleLower.includes("boarding") || 
-    titleLower.includes("depart") || 
-    titleLower.includes("arrive") || 
-    descLower.includes("flight") || 
+    typeLower === "airport" ||
+    typeLower === "flight" ||
+    titleLower.includes("flight") ||
+    titleLower.includes("boarding") ||
+    titleLower.includes("depart") ||
+    titleLower.includes("arrive") ||
+    descLower.includes("flight") ||
     descLower.includes("terminal")
   ) {
     return "Flight";
@@ -180,15 +147,15 @@ const getActivityLabel = (activity: Activity, trip: Trip): "Want-to-go" | "Fligh
 
   // Hotel classification
   if (
-    typeLower === "checkin" || 
+    typeLower === "checkin" ||
     typeLower === "hotel" ||
     typeLower === "stay" ||
-    titleLower.includes("hotel") || 
-    titleLower.includes("check-in") || 
-    titleLower.includes("check in") || 
-    titleLower.includes("hostel") || 
-    titleLower.includes("resort") || 
-    descLower.includes("hotel") || 
+    titleLower.includes("hotel") ||
+    titleLower.includes("check-in") ||
+    titleLower.includes("check in") ||
+    titleLower.includes("hostel") ||
+    titleLower.includes("resort") ||
+    descLower.includes("hotel") ||
     descLower.includes("stay at") ||
     descLower.includes("room check-in")
   ) {
@@ -209,10 +176,10 @@ const getActivityLabel = (activity: Activity, trip: Trip): "Want-to-go" | "Fligh
 
 const renderLabelBadge = (activity: Activity, trip: Trip) => {
   const label = getActivityLabel(activity, trip);
-  
+
   let labelStyle = "";
   let icon = null;
-  
+
   if (label === "Want-to-go") {
     labelStyle = "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/60";
     icon = <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />;
@@ -274,252 +241,7 @@ const categorizeActivityTime = (timeStr: string): "Morning" | "Afternoon" | "Eve
 
 const getSlotActivities = (day: DayItinerary | undefined, slot: "Morning" | "Afternoon" | "Evening", trip?: Trip): Activity[] => {
   if (!day) return [];
-  
-  // Filter activities that match this category
-  const filtered = day.activities.filter(act => categorizeActivityTime(act.time) === slot);
-  
-  if (filtered.length > 0) {
-    return filtered;
-  }
-  
-  // Cleanly identify the main destination
-  let destination = "the city";
-  if (trip && trip.destinations && trip.destinations.length > 0) {
-    destination = trip.destinations[0];
-  } else if (day.activities && day.activities[0] && day.activities[0].location) {
-    destination = day.activities[0].location;
-  }
-
-  const destLower = destination.toLowerCase();
-
-  // Create a stunning curated list of highly specific placeholders matching popular travel destinations
-  interface CuratedSlot {
-    title: string;
-    description: string;
-    location: string;
-    type: string;
-    openingHours: string;
-    budgetRange: string;
-  }
-
-  let selected: CuratedSlot;
-
-  if (destLower.includes("tokyo")) {
-    const spots = {
-      Morning: {
-        title: "Tsukiji Outer Market Culinary Stroll",
-        description: "Savor fresh-rolled tamagoyaki egg skewers, fresh sashimi, and matcha lattes from local vendors.",
-        location: "Tsukiji Outer Market, Tokyo",
-        type: "food",
-        openingHours: "05:00 AM - 02:00 PM",
-        budgetRange: "¥500 - ¥2,500"
-      },
-      Afternoon: {
-        title: "Meiji Jingu Shrine & Harajuku Discovery",
-        description: "Stroll through the towering cedar forest of Tokyo's grandest shrine, followed by exploring the fashion alleys of Takeshita Street.",
-        location: "Meiji Jingu Shrine, Tokyo",
-        type: "culture",
-        openingHours: "09:00 AM - 05:00 PM",
-        budgetRange: "Free"
-      },
-      Evening: {
-        title: "Shibuya Crossing & Shibuya Sky Sunset View",
-        description: "Witness the legendary Shibuya crowd wave from above and snap 360-degree sunset skyline photos on the open-air deck.",
-        location: "Shibuya Sky, Tokyo",
-        type: "leisure",
-        openingHours: "10:00 AM - 10:30 PM",
-        budgetRange: "¥2,200"
-      }
-    };
-    selected = spots[slot];
-  } else if (destLower.includes("singapore")) {
-    const spots = {
-      Morning: {
-        title: "Marina Bay Waterfront Stroll & Kaya Toast",
-        description: "Enjoy traditional butter and kaya toast at Ya Kun, then take a refreshing walk along the breezy Marina Boardwalk.",
-        location: "Marina Bay Sands Promenade, Singapore",
-        type: "food",
-        openingHours: "07:30 AM - 10:00 PM",
-        budgetRange: "S$5 - S$12"
-      },
-      Afternoon: {
-        title: "Gardens by the Bay Conservatories",
-        description: "Explore the mist-filled Cloud Forest mountain and the majestic Flower Dome inside these state-of-the-art climate conservatories.",
-        location: "Gardens by the Bay, Singapore",
-        type: "leisure",
-        openingHours: "09:00 AM - 09:00 PM",
-        budgetRange: "S$28 - S$53"
-      },
-      Evening: {
-        title: "Lau Pa Sat Hawker Feast & Satay Streets",
-        description: "Dine under historic Victorian cast-iron frames. Savor freshly grilled satay skewers with peanut sauce and cold local Tiger beer.",
-        location: "Lau Pa Sat, Singapore",
-        type: "food",
-        openingHours: "Open 24 hours",
-        budgetRange: "S$10 - S$30"
-      }
-    };
-    selected = spots[slot];
-  } else if (destLower.includes("kuala lumpur") || destLower.includes("kl")) {
-    const spots = {
-      Morning: {
-        title: "Breakfast & Brews at VCR Cafe",
-        description: "Sip custom pour-overs and sample gourmet avocado toasts inside a charming, restored mid-century building.",
-        location: "VCR Galloway, Kuala Lumpur",
-        type: "food",
-        openingHours: "08:30 AM - 05:00 PM",
-        budgetRange: "RM15 - RM40"
-      },
-      Afternoon: {
-        title: "Petronas Twin Towers Skybridge Visit",
-        description: "Walk the double-decker connection on the 41st floor and view the bustling city center from 170 meters high.",
-        location: "Petronas Twin Towers, Kuala Lumpur",
-        type: "leisure",
-        openingHours: "09:00 AM - 09:00 PM",
-        budgetRange: "RM35 - RM80"
-      },
-      Evening: {
-        title: "Street Food Feast at Jalan Alor Night Market",
-        description: "Immerse in the neon-hued food lane. Try charcoal-grilled chicken wings, oyster omelets, and dim sum from bustling roadside stalls.",
-        location: "Jalan Alor, Kuala Lumpur",
-        type: "food",
-        openingHours: "05:00 PM - 03:00 AM",
-        budgetRange: "RM10 - RM35"
-      }
-    };
-    selected = spots[slot];
-  } else if (destLower.includes("london")) {
-    const spots = {
-      Morning: {
-        title: "Specialty Coffee at Monmouth Coffee, Borough Market",
-        description: "Start with some of London's legendary drip coffee paired with artisan morning pastries inside the historic food market.",
-        location: "Borough Market, London",
-        type: "food",
-        openingHours: "08:00 AM - 05:00 PM",
-        budgetRange: "£4 - £12"
-      },
-      Afternoon: {
-        title: "British Museum Highlights Tour",
-        description: "View world-treasured archaeological wonders including the Rosetta Stone and the Parthenon Sculptures under the iconic Great Court roof.",
-        location: "British Museum, London",
-        type: "culture",
-        openingHours: "10:00 AM - 05:00 PM",
-        budgetRange: "Free (Donation suggested)"
-      },
-      Evening: {
-        title: "West End Theatre District Walk & Soho Dinner",
-        description: "Soak in the glowing theater signs of Piccadilly Circus and enjoy a comforting dinner at a highly-rated Soho bistro.",
-        location: "Soho, London",
-        type: "food",
-        openingHours: "Open late",
-        budgetRange: "£15 - £40"
-      }
-    };
-    selected = spots[slot];
-  } else if (destLower.includes("paris")) {
-    const spots = {
-      Morning: {
-        title: "Croissant Tasting at Du Pain et des Idées",
-        description: "Sample Paris's most acclaimed escargot pastries and warm butter croissants along the beautiful Saint-Martin canal.",
-        location: "Du Pain et des Idées, Paris",
-        type: "food",
-        openingHours: "07:00 AM - 07:30 PM",
-        budgetRange: "€3 - €10"
-      },
-      Afternoon: {
-        title: "Louvre Museum Architectural Garden Walk",
-        description: "View the magnificent glass pyramids, stroll down Tuileries Garden, and discover boutique Parisian galleries nearby.",
-        location: "Louvre Museum, Paris",
-        type: "leisure",
-        openingHours: "09:00 AM - 06:00 PM",
-        budgetRange: "Free - €22"
-      },
-      Evening: {
-        title: "Scenic Seine River Cruise & Eiffel Tower Twilight",
-        description: "Sail down the river as historical monuments light up in a warm glow, then watch the Eiffel Tower sparkle on the hour.",
-        location: "Eiffel Tower, Paris",
-        type: "sightseeing",
-        openingHours: "09:30 AM - 11:45 PM",
-        budgetRange: "€15 - €30"
-      }
-    };
-    selected = spots[slot];
-  } else if (destLower.includes("new york") || destLower.includes("nyc")) {
-    const spots = {
-      Morning: {
-        title: "Artisan Bagels at Ess-a-Bagel",
-        description: "Sink your teeth into a giant, hand-rolled NY bagel loaded with gourmet cream cheese spreads and classic smoked salmon.",
-        location: "Ess-a-Bagel, New York",
-        type: "food",
-        openingHours: "06:00 AM - 05:00 PM",
-        budgetRange: "$6 - $20"
-      },
-      Afternoon: {
-        title: "The High Line Elevated Garden Walk",
-        description: "Stroll along this beautifully landscaped 1.45-mile park built on an old freight rail line, overlooking Chelsea galleries.",
-        location: "The High Line, New York",
-        type: "leisure",
-        openingHours: "07:00 AM - 10:00 PM",
-        budgetRange: "Free"
-      },
-      Evening: {
-        title: "Times Square & Broadway Theatre Walk",
-        description: "Be dazzled by the canyon of neon billboards, feel the high-voltage Manhattan energy, and grab dinner in Hell's Kitchen.",
-        location: "Times Square, New York",
-        type: "sightseeing",
-        openingHours: "Open all hours",
-        budgetRange: "$15 - $45"
-      }
-    };
-    selected = spots[slot];
-  } else {
-    // Elegant fallback dynamically adapted to any generic destination name requested
-    const spots = {
-      Morning: {
-        title: `Scenic Morning Heritage Discovery in ${destination}`,
-        description: `Explore charming local squares and historical alleys. Discover artisan boutiques and sip on locally brewed coffee.`,
-        location: `${destination} City Center`,
-        type: "sightseeing",
-        openingHours: "Open daily",
-        budgetRange: "Free"
-      },
-      Afternoon: {
-        title: `Artisanal Shopping & Tasting at ${destination} Markets`,
-        description: `Immerse yourself in native street handicrafts, souvenirs, and try delicious gourmet specialities popular in the region.`,
-        location: `${destination} Central Market`,
-        type: "shopping",
-        openingHours: "09:00 AM - 06:00 PM",
-        budgetRange: "Leisurely"
-      },
-      Evening: {
-        title: `Sunset Skyline & Food Walking Tour in ${destination}`,
-        description: `Stroll down the popular waterfront promenade, take photos of monumental landmarks under golden twilight, and dine in a loved local restaurant.`,
-        location: `${destination} Waterfront`,
-        type: "food",
-        openingHours: "Open late",
-        budgetRange: "Curated"
-      }
-    };
-    selected = spots[slot];
-  }
-
-  const times = {
-    Morning: "08:30 AM",
-    Afternoon: "02:00 PM",
-    Evening: "07:00 PM"
-  };
-
-  return [{
-    id: `placeholder_${slot.toLowerCase()}_${day.dayIndex}`,
-    time: times[slot],
-    title: selected.title,
-    description: selected.description,
-    location: selected.location,
-    type: selected.type,
-    openingHours: selected.openingHours,
-    budgetRange: selected.budgetRange,
-    label: "AI suggested"
-  }];
+  return day.activities.filter(act => categorizeActivityTime(act.time) === slot);
 };
 
 const isPeriodHiddenByFlight = (day: DayItinerary | undefined, period: "Morning" | "Afternoon" | "Evening", trip: Trip): boolean => {
@@ -565,8 +287,9 @@ const convertAmount = (amount: number, from: string, to: string): number => {
   const cleanFrom = (from || "USD").toUpperCase();
   const cleanTo = (to || "USD").toUpperCase();
   if (cleanFrom === cleanTo) return amount;
-  const fromRate = USD_RATES[cleanFrom] || 1.0;
-  const toRate = USD_RATES[cleanTo] || 1.0;
+  const rates = dynamicRates || USD_RATES;
+  const fromRate = rates[cleanFrom] || 1.0;
+  const toRate = rates[cleanTo] || 1.0;
   return (amount / fromRate) * toRate;
 };
 
@@ -617,13 +340,11 @@ const convertPriceString = (text: string | undefined, base: string = "USD", targ
         }
 
         if (sourceCurr === cleanTarget) {
-          const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
-          return `${targetSymbol}${num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          return `${num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${cleanTarget}`;
         }
 
         const conv = convertAmount(num, sourceCurr, cleanTarget);
-        const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
-        return `${targetSymbol}${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        return `${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${cleanTarget}`;
       }
       return match;
     });
@@ -636,8 +357,7 @@ const convertPriceString = (text: string | undefined, base: string = "USD", targ
   const pureNum = parseFloat(text.replace(/[^0-9.]/g, ""));
   if (!isNaN(pureNum) && /^\d+$/.test(text.trim().replace(/,/g, ""))) {
     const conv = convertAmount(pureNum, base, cleanTarget);
-    const targetSymbol = CURRENCY_SYMBOLS[cleanTarget] || "$";
-    return `${targetSymbol}${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `${conv.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${cleanTarget}`;
   }
 
   return text;
@@ -649,7 +369,7 @@ const getStartTimeInMinutes = (timeSlot: string): number => {
     const parts = normalized.split("-");
     if (parts.length === 0) return 0;
     const startText = parts[0].trim().toLowerCase();
-    
+
     // Matched both hour-only (e.g. "10 am") and full (e.g. "10:30 am")
     const match = startText.match(/(\d+)(?::(\d+))?\s*(am|pm)?/);
     if (match) {
@@ -682,7 +402,7 @@ const getScheduledDayOfPlace = (placeName: string, itinerary: any[] | undefined)
 
 const getAISuggestedDayForPlace = (placeName: string, itinerary: any[] | undefined) => {
   if (!itinerary || itinerary.length === 0) return { suggestedDayIdx: 1, reason: "balanced exploration schedule" };
-  
+
   const cleanPlace = placeName.toLowerCase();
   let bestDayIdx = -1;
   let maxScore = 0;
@@ -694,7 +414,7 @@ const getAISuggestedDayForPlace = (placeName: string, itinerary: any[] | undefin
     let score = 0;
     let matchedAttractionName = "";
     const cleanTheme = day.theme.toLowerCase();
-    
+
     placeTokens.forEach(token => {
       if (cleanTheme.includes(token)) {
         score += 3;
@@ -722,7 +442,7 @@ const getAISuggestedDayForPlace = (placeName: string, itinerary: any[] | undefin
     if (score > maxScore) {
       maxScore = score;
       bestDayIdx = day.dayIndex;
-      matchedReason = matchedAttractionName 
+      matchedReason = matchedAttractionName
         ? `shares proximity with your planned visit to ${matchedAttractionName}`
         : `matches the Day's Focus: "${day.theme}"`;
     }
@@ -784,6 +504,52 @@ const getAISuggestedDayForPlace = (placeName: string, itinerary: any[] | undefin
   };
 };
 
+const parseTimeSlotString = (timeSlot: string) => {
+  if (!timeSlot) return { start: "09:00", end: "" };
+  const normalized = timeSlot.replace(/\s+to\s+/gi, " - ");
+  const parts = normalized.split("-");
+
+  const to24h = (timePart: string, defaultVal: string): string => {
+    if (!timePart) return defaultVal;
+    const clean = timePart.trim().toLowerCase();
+    const match = clean.match(/(\d+)(?::(\d+))?\s*(am|pm)?/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2] ? parseInt(match[2], 10) : 0;
+      const ampm = match[3];
+      if (ampm === "pm" && hours < 12) hours += 12;
+      if (ampm === "am" && hours === 12) hours = 0;
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+    return defaultVal;
+  };
+
+  const start24 = parts[0] ? to24h(parts[0], "09:00") : "09:00";
+  const end24 = parts[1] ? to24h(parts[1], "") : "";
+  return { start: start24, end: end24 };
+};
+
+const format24hTo12h = (time24: string): string => {
+  if (!time24) return "";
+  const parts = time24.split(":");
+  if (parts.length < 2) return "";
+  let hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const ampm = hours >= 12 ? "PM" : "AM";
+  if (hours > 12) hours -= 12;
+  if (hours === 0) hours = 12;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${ampm}`;
+};
+
+const makeTimeSlotString = (start24: string, end24: string): string => {
+  const start12 = format24hTo12h(start24);
+  const end12 = format24hTo12h(end24);
+  if (start12 && end12) {
+    return `${start12} - ${end12}`;
+  }
+  return start12 || "";
+};
+
 interface ItineraryDisplayProps {
   trip: Trip;
   favoritedActivities: string[];
@@ -811,32 +577,81 @@ export default function ItineraryDisplay({
 }: ItineraryDisplayProps) {
   // Navigation tabs
   const [activeDayIdx, setActiveDayIdx] = useState(1);
+  useEffect(() => {
+    if (!dynamicRates) {
+      fetchLiveRates();
+    }
+  }, []);
   const [focusedLocation, setFocusedLocation] = useState<string>(
     trip.itinerary && trip.itinerary[0]?.activities[0]?.location || trip.destinations[0]
   );
-  
+
   // Custom natural-language assistant edits input
   const [naturalLanguageInput, setNaturalLanguageInput] = useState("");
 
   // Direct inline editing states
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
-  const [editTime, setEditTime] = useState("");
+  const [editStartTime, setEditStartTime] = useState("09:00");
+  const [editEndTime, setEditEndTime] = useState("10:00");
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editTransitOrigin, setEditTransitOrigin] = useState("");
   const [editHours, setEditHours] = useState("");
   const [editBudget, setEditBudget] = useState("");
   const [editLabel, setEditLabel] = useState("");
 
   // Addition states
   const [isAddingActivity, setIsAddingActivity] = useState(false);
-  const [newActTime, setNewActTime] = useState("");
+  const [newActStartTime, setNewActStartTime] = useState("10:00");
+  const [newActEndTime, setNewActEndTime] = useState("11:30");
   const [newActTitle, setNewActTitle] = useState("");
   const [newActDesc, setNewActDesc] = useState("");
   const [newActLocation, setNewActLocation] = useState("");
+  const [newActTransitOrigin, setNewActTransitOrigin] = useState("");
   const [newActHours, setNewActHours] = useState("");
   const [newActBudget, setNewActBudget] = useState("");
-  const [newActLabel, setNewActLabel ] = useState("Want-to-go");
+  const [newActLabel, setNewActLabel] = useState("Want-to-go");
+
+  // Autocomplete suggestion states for Named Map Location
+  const [locSuggestions, setLocSuggestions] = useState<any[]>([]);
+  const [isSearchingLoc, setIsSearchingLoc] = useState(false);
+  const [showLocDropdown, setShowLocDropdown] = useState(false);
+  const [activeLocField, setActiveLocField] = useState<"edit" | "editOrigin" | "new" | "newOrigin" | "wishlist" | null>(null);
+
+  const fetchLocationSuggestions = async (titleQuery: string, locationQuery: string, fieldType: "edit" | "editOrigin" | "new" | "newOrigin" | "wishlist") => {
+    setActiveLocField(fieldType);
+    const searchVal = locationQuery.trim() || titleQuery.trim();
+    if (searchVal.length < 2) {
+      setLocSuggestions([]);
+      setShowLocDropdown(false);
+      return;
+    }
+    setIsSearchingLoc(true);
+    setShowLocDropdown(true);
+    try {
+      const res = await fetch("/api/suggest-attractions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: searchVal,
+          destinations: fieldType === "wishlist" && trip.destinations && trip.destinations.length > 0
+            ? trip.destinations
+            : [activeDayDestination]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.suggestions) {
+          setLocSuggestions(data.suggestions);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching location suggestions:", err);
+    } finally {
+      setIsSearchingLoc(false);
+    }
+  };
 
   // Flight Editing/Addition states
   const [editingFlightId, setEditingFlightId] = useState<string | null>(null);
@@ -927,7 +742,7 @@ export default function ItineraryDisplay({
         // 1. Try matching by stay dates in the traveler stays
         if (checkInDate && trip.destinationStays) {
           for (const [destName, stayRange] of Object.entries(trip.destinationStays)) {
-            if (checkInDate >= stayRange.start && checkInDate <= stayRange.end) {
+            if (checkInDate >= stayRange.start && checkInDate < stayRange.end) {
               matchedDest = destName;
               break;
             }
@@ -1010,7 +825,7 @@ export default function ItineraryDisplay({
         const response = await fetch("/api/validate-itinerary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             activities: activeDay.activities
           })
         });
@@ -1029,7 +844,7 @@ export default function ItineraryDisplay({
 
     return () => clearTimeout(timer);
   }, [
-    activeDayIdx, 
+    activeDayIdx,
     activeDay?.activities?.map(a => `${a.id}_${a.time}_${a.location}_${getPreferredMode(a)}`).join("|")
   ]);
 
@@ -1111,7 +926,7 @@ export default function ItineraryDisplay({
         };
 
         const nextActivities = [...day.activities, newAct];
-        
+
         // Sort chronologically by time so it goes to the correct position
         const getMinutes = (timeStr: string): number => {
           try {
@@ -1124,10 +939,10 @@ export default function ItineraryDisplay({
               if (ampm === "am" && hours === 12) hours = 0;
               return hours * 60 + minutes;
             }
-          } catch (_) {}
+          } catch (_) { }
           return 0;
         };
-        nextActivities.sort((a,b) => getMinutes(a.time) - getMinutes(b.time));
+        nextActivities.sort((a, b) => getMinutes(a.time) - getMinutes(b.time));
 
         return {
           ...day,
@@ -1176,6 +991,12 @@ export default function ItineraryDisplay({
   const handleFocusLocation = (loc: string) => {
     if (loc) {
       setFocusedLocation(loc);
+      setTimeout(() => {
+        const mapEl = document.getElementById("google-map-section");
+        if (mapEl) {
+          mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
     }
   };
 
@@ -1217,10 +1038,13 @@ export default function ItineraryDisplay({
 
   const handleStartEdit = (act: Activity) => {
     setEditingActivityId(act.id);
-    setEditTime(act.time || "");
+    const parsed = parseTimeSlotString(act.time || "");
+    setEditStartTime(parsed.start);
+    setEditEndTime(parsed.end);
     setEditTitle(act.title || "");
     setEditDesc(act.description || "");
     setEditLocation(act.location || "");
+    setEditTransitOrigin(act.customTransitOrigin || "");
     setEditHours(act.openingHours || "");
     setEditBudget(act.budgetRange || "");
     setEditLabel(act.label || getActivityLabel(act, trip));
@@ -1228,6 +1052,7 @@ export default function ItineraryDisplay({
 
   const handleSaveActivityEdit = (actId: string) => {
     if (!trip.itinerary) return;
+    const finalTime = makeTimeSlotString(editStartTime, editEndTime);
     const updatedItinerary = trip.itinerary.map(day => {
       if (day.dayIndex !== activeDayIdx) return day;
 
@@ -1237,10 +1062,11 @@ export default function ItineraryDisplay({
         // Create an actual activity object based on the edited inputs
         const newAct: Activity = {
           id: `act_user_${Date.now()}`,
-          time: editTime,
+          time: finalTime,
           title: editTitle,
           description: editDesc,
           location: editLocation || "City Center",
+          customTransitOrigin: editTransitOrigin.trim() || undefined,
           type: "activity",
           openingHours: editHours,
           budgetRange: editBudget,
@@ -1258,10 +1084,11 @@ export default function ItineraryDisplay({
           if (act.id !== actId) return act;
           return {
             ...act,
-            time: editTime,
+            time: finalTime,
             title: editTitle,
             description: editDesc,
             location: editLocation,
+            customTransitOrigin: editTransitOrigin.trim() || undefined,
             openingHours: editHours,
             budgetRange: editBudget,
             label: editLabel
@@ -1344,24 +1171,24 @@ export default function ItineraryDisplay({
 
   const handleMoveActivity = async (activityId: string, direction: "up" | "down") => {
     if (!activeDay || !activeDay.activities || !trip.itinerary) return;
-    
+
     const activities = [...activeDay.activities];
     const index = activities.findIndex(a => a.id === activityId);
     if (index === -1) return;
-    
+
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= activities.length) return;
-    
+
     // Swap activities in the array
     const temp = activities[index];
     activities[index] = activities[targetIndex];
     activities[targetIndex] = temp;
-    
+
     // Swap their time slot strings chronologically so they occupy each other's slots beautifully
     const tempTime = activities[index].time;
     activities[index].time = activities[targetIndex].time;
     activities[targetIndex].time = tempTime;
-    
+
     // Render the updated swap state immediately in trip state
     const updatedItinerary = trip.itinerary.map(day => {
       if (day.dayIndex !== activeDayIdx) return day;
@@ -1422,14 +1249,42 @@ export default function ItineraryDisplay({
     await recalculateAndSaveTransitForDay(activities, activeDayIdx);
   };
 
+  const getActiveHotelForDay = (dayDate: string | undefined): any => {
+    if (!dayDate || !trip.hotels || trip.hotels.length === 0) return undefined;
+    
+    // Sort hotels chronologically by check-in date
+    const sortedHotels = [...trip.hotels].sort((a, b) => {
+      const aIn = a.checkIn ? a.checkIn.split("T")[0] : "";
+      const bIn = b.checkIn ? b.checkIn.split("T")[0] : "";
+      return aIn.localeCompare(bIn);
+    });
+
+    const formatToDateStr = (dateStr: string) => {
+      return dateStr.includes("T") ? dateStr.split("T")[0] : dateStr.trim();
+    };
+
+    const targetDate = formatToDateStr(dayDate);
+
+    let activeH = sortedHotels[0];
+    for (const hotel of sortedHotels) {
+      const checkIn = hotel.checkIn ? formatToDateStr(hotel.checkIn) : "";
+      const checkOut = hotel.checkOut ? formatToDateStr(hotel.checkOut) : "";
+      if (checkIn && checkOut && targetDate >= checkIn && targetDate <= checkOut) {
+        activeH = hotel;
+      }
+    }
+    return activeH;
+  };
+
   const handleOptimizeRoute = async () => {
     if (!activeDay || !activeDay.activities || activeDay.activities.length < 2) return;
     setIsOptimizing(true);
     setOptimizeSuccessMsg("");
     try {
-      const hotelName = trip.hotels && trip.hotels.length > 0 ? trip.hotels[0].name : "";
+      const activeHotel = getActiveHotelForDay(activeDay?.date);
+      const hotelName = activeHotel ? activeHotel.name : "";
       const startLoc = trip.destinations && trip.destinations.length > 0 ? trip.destinations[0] : "City Center";
-      
+
       const response = await fetch("/api/optimize-schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1451,7 +1306,7 @@ export default function ItineraryDisplay({
               activities: body.activities
             };
           }) || [];
-          
+
           onUpdateTrip({
             ...trip,
             itinerary: updatedItinerary
@@ -1471,12 +1326,18 @@ export default function ItineraryDisplay({
   const getOriginLocationForActivity = (activityId: string): string => {
     if (!activeDay || !activeDay.activities) return "";
     const idx = activeDay.activities.findIndex(a => a.id === activityId);
+    if (idx === -1) return "";
+    const act = activeDay.activities[idx];
+    if (act.customTransitOrigin) {
+      return act.customTransitOrigin;
+    }
     if (idx > 0) {
       return activeDay.activities[idx - 1].location;
     }
     // Fallback to accommodation hotel or default destination if it's the first activity
-    if (trip.hotels && trip.hotels.length > 0) {
-      return trip.hotels[0].name;
+    const activeHotel = getActiveHotelForDay(activeDay?.date);
+    if (activeHotel) {
+      return activeHotel.name;
     }
     return trip.destinations[0] || "City Center";
   };
@@ -1485,14 +1346,18 @@ export default function ItineraryDisplay({
     if (!activeDay || !activeDay.activities) return { from: "", to: "" };
     const idx = activeDay.activities.findIndex(a => a.id === activityId);
     if (idx === -1) return { from: "", to: "" };
-    
-    const to = activeDay.activities[idx].title || activeDay.activities[idx].location;
+
+    const act = activeDay.activities[idx];
+    const to = act.title || act.location;
     let from = "";
-    if (idx > 0) {
+    if (act.customTransitOrigin) {
+      from = act.customTransitOrigin;
+    } else if (idx > 0) {
       from = activeDay.activities[idx - 1].title || activeDay.activities[idx - 1].location;
     } else {
-      if (trip.hotels && trip.hotels.length > 0) {
-        from = `🏨 ${trip.hotels[0].name}`;
+      const activeHotel = getActiveHotelForDay(activeDay?.date);
+      if (activeHotel) {
+        from = `🏨 ${activeHotel.name}`;
       } else {
         from = trip.destinations[0] || "City Center";
       }
@@ -1502,7 +1367,7 @@ export default function ItineraryDisplay({
 
   const handleToggleActivityTransitMode = async (activityId: string, targetMode: "transit" | "driving" | "walking") => {
     if (!trip.itinerary || !activeDay) return;
-    
+
     // Set loading indicator
     setUpdatingTransitIds(prev => ({ ...prev, [activityId]: true }));
 
@@ -1564,12 +1429,14 @@ export default function ItineraryDisplay({
     e.preventDefault();
     if (!newActTitle.trim()) return;
 
+    const finalTime = makeTimeSlotString(newActStartTime, newActEndTime);
     const newAct: Activity = {
       id: "act_user_" + Date.now().toString(36),
       title: newActTitle.trim(),
-      time: newActTime || "10:00 AM",
+      time: finalTime || "10:00 AM",
       description: newActDesc.trim() || "Custom planned tourist attraction or rest stop.",
       location: newActLocation.trim() || trip.destinations[0],
+      customTransitOrigin: newActTransitOrigin.trim() || undefined,
       type: "activity", // default
       openingHours: newActHours,
       budgetRange: newActBudget,
@@ -1601,9 +1468,11 @@ export default function ItineraryDisplay({
 
     // Reset inputs
     setNewActTitle("");
-    setNewActTime("");
+    setNewActStartTime("10:00");
+    setNewActEndTime("11:30");
     setNewActDesc("");
     setNewActLocation("");
+    setNewActTransitOrigin("");
     setNewActHours("");
     setNewActBudget("");
     setNewActLabel("Want-to-go");
@@ -1611,6 +1480,36 @@ export default function ItineraryDisplay({
   };
 
   // --- FLIGHT MANAGEMENT HANDLERS ---
+  const validateFlights = (flightsList: any[]): string | null => {
+    for (const f of flightsList) {
+      if (!f.departureTime || !f.arrivalTime) {
+        continue;
+      }
+      const dep = new Date(f.departureTime).getTime();
+      const arr = new Date(f.arrivalTime).getTime();
+      if (isNaN(dep) || isNaN(arr)) {
+        return `Invalid date/time format for Flight ${f.flightNo ? '#' + f.flightNo : ''}.`;
+      }
+      if (dep >= arr) {
+        return `For Flight ${f.flightNo ? '#' + f.flightNo : ''}, the departure time (${f.departureTime.replace('T', ' ')}) must be strictly BEFORE the arrival time (${f.arrivalTime.replace('T', ' ')}).`;
+      }
+    }
+
+    const departFlights = flightsList.filter(f => f.type === "depart");
+    const returnFlights = flightsList.filter(f => f.type === "return");
+
+    for (const d of departFlights) {
+      for (const r of returnFlights) {
+        const depTimeOut = new Date(d.departureTime).getTime();
+        const depTimeRet = new Date(r.departureTime).getTime();
+        if (!isNaN(depTimeOut) && !isNaN(depTimeRet) && depTimeOut >= depTimeRet) {
+          return `The outbound departure flight (${d.flightNo ? '#' + d.flightNo : 'departure'}) must depart BEFORE the return flight (${r.flightNo ? '#' + r.flightNo : 'return'}) departs.`;
+        }
+      }
+    }
+    return null;
+  };
+
   const handleStartEditFlight = (f: any) => {
     setEditingFlightId(f.id);
     setEditFlightType(f.type || "depart");
@@ -1627,13 +1526,20 @@ export default function ItineraryDisplay({
       return {
         ...f,
         type: editFlightType,
-        flightNo: editFlightNo,
-        departureAirport: editFlightDepAirport,
-        arrivalAirport: editFlightArrAirport,
+        flightNo: editFlightNo.trim(),
+        departureAirport: editFlightDepAirport.trim(),
+        arrivalAirport: editFlightArrAirport.trim(),
         departureTime: editFlightDepTime,
         arrivalTime: editFlightArrTime
       };
     });
+
+    const error = validateFlights(updatedFlights);
+    if (error) {
+      alert(error);
+      return;
+    }
+
     onUpdateTrip({
       ...trip,
       flights: updatedFlights
@@ -1660,9 +1566,15 @@ export default function ItineraryDisplay({
       departureTime: newFlightDepTime || `${trip.startDate}T11:00`,
       arrivalTime: newFlightArrTime || `${trip.startDate}T17:00`
     };
+    const updatedFlights = [...(trip.flights || []), newF];
+    const error = validateFlights(updatedFlights);
+    if (error) {
+      alert(error);
+      return;
+    }
     onUpdateTrip({
       ...trip,
-      flights: [...(trip.flights || []), newF]
+      flights: updatedFlights
     });
     // reset
     setNewFlightNo("");
@@ -1840,7 +1752,7 @@ export default function ItineraryDisplay({
     trip.itinerary.forEach(day => {
       day.activities.forEach(act => {
         const actDateTime = parseActivityTime(day.date, act.time);
-        
+
         if (departLimit && actDateTime < departLimit) {
           conflicts.push({
             activityTitle: act.title,
@@ -1865,10 +1777,10 @@ export default function ItineraryDisplay({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      
+
       {/* LEFT: Complete Timeline Flow (8 Cols) */}
       <div className="lg:col-span-8 space-y-8">
-        
+
         {/* Multi-destination staying plan banner */}
         {trip.destinations && trip.destinations.length > 1 && (() => {
           const timelines = getDestinationTimelines();
@@ -1878,14 +1790,14 @@ export default function ItineraryDisplay({
                 <span>📍 Multi-Place Route Map & Stay Timeline</span>
                 <span className="h-px bg-slate-100 flex-1"></span>
               </h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {timelines.map((item, index) => (
                   <div key={index} className="relative bg-white border border-slate-150 rounded-2xl p-4 flex flex-col justify-between transition-all hover:border-indigo-200 hover:shadow-2xs group">
                     <div className="absolute top-0 right-0 p-3 text-[10px] font-mono font-extrabold text-indigo-600 bg-indigo-50/50 rounded-tr-2xl rounded-bl-xl group-hover:bg-indigo-50/80 leading-none">
                       Stop {index + 1}
                     </div>
-                    
+
                     <div>
                       <div className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest">
                         Location / Area
@@ -2031,17 +1943,15 @@ export default function ItineraryDisplay({
                     setFocusedLocation(day.activities[0].location);
                   }
                 }}
-                className={`py-1.5 px-3.5 rounded-2xl transition-all font-sans flex flex-col items-center justify-center text-center shrink-0 cursor-pointer min-w-[72px] border ${
-                  activeDayIdx === day.dayIndex
-                    ? "bg-slate-950 border-slate-950 text-white shadow-sm font-bold scale-[1.02]"
-                    : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100/80 hover:text-slate-900 hover:border-slate-200"
-                }`}
+                className={`py-1.5 px-3.5 rounded-2xl transition-all font-sans flex flex-col items-center justify-center text-center shrink-0 cursor-pointer min-w-[72px] border ${activeDayIdx === day.dayIndex
+                  ? "bg-slate-950 border-slate-950 text-white shadow-sm font-bold scale-[1.02]"
+                  : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100/80 hover:text-slate-900 hover:border-slate-200"
+                  }`}
               >
                 <span className="text-[11px] font-black uppercase tracking-wider">Day {day.dayIndex}</span>
                 {day.date && (
-                  <span className={`text-[9px] font-semibold font-mono tracking-normal mt-0.5 ${
-                    activeDayIdx === day.dayIndex ? "text-indigo-200 animate-fade-in" : "text-slate-450 text-slate-400"
-                  }`}>
+                  <span className={`text-[9px] font-semibold font-mono tracking-normal mt-0.5 ${activeDayIdx === day.dayIndex ? "text-indigo-200 animate-fade-in" : "text-slate-450 text-slate-400"
+                    }`}>
                     {formatShortDate(day.date)}
                   </span>
                 )}
@@ -2065,21 +1975,21 @@ export default function ItineraryDisplay({
               >
                 <optgroup label="🏡 Home Country Currency">
                   <option value={homeCurr}>
-                    {homeCurr} ({CURRENCY_SYMBOLS[homeCurr] || "$"}) - Home
+                    {homeCurr} - Home
                   </option>
                 </optgroup>
                 {travelCurrs.length > 0 && (
                   <optgroup label="✈️ Travel Destination Currency">
                     {travelCurrs.map(curr => (
                       <option key={curr} value={curr}>
-                        {curr} ({CURRENCY_SYMBOLS[curr] || "$"}) - Destination
+                        {curr} - Destination
                       </option>
                     ))}
                   </optgroup>
                 )}
                 <optgroup label="🌐 All Other Currencies">
                   {remainingCurrs.map(curr => (
-                    <option key={curr} value={curr}>{curr} ({CURRENCY_SYMBOLS[curr] || "$"})</option>
+                    <option key={curr} value={curr}>{curr}</option>
                   ))}
                 </optgroup>
               </select>
@@ -2105,7 +2015,7 @@ export default function ItineraryDisplay({
               <h3 className="text-lg font-bold tracking-tight text-slate-900 mt-0.5">
                 {activeDay?.theme}
               </h3>
-              <p className="text-[11px] text-indigo-650 font-semibold mt-1.5 flex items-center gap-1.5 bg-indigo-50/60 w-fit px-2.5 py-1 rounded-xl">
+              <p className="text-[11px] text-indigo-600 font-semibold mt-1.5 flex items-center gap-1.5 bg-indigo-50/60 w-fit px-2.5 py-1 rounded-xl">
                 <span>⚡</span> Tip: Drag and drop cards to swap schedule slots instantly!
               </p>
             </div>
@@ -2133,532 +2043,629 @@ export default function ItineraryDisplay({
 
                   <div className="space-y-6">
                     {periodActivities.map((activity, index) => {
-              const isSelectedMap = focusedLocation.toLowerCase() === activity.location.toLowerCase();
-              const isEditing = editingActivityId === activity.id;
+                      const isSelectedMap = focusedLocation.toLowerCase() === activity.location.toLowerCase();
+                      const isEditing = editingActivityId === activity.id;
 
-              return (
-                <div key={activity.id} className="relative group">
-                  {/* Timeline bullet indicator */}
-                  <span className={`absolute -left-10 top-1 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center transition-all ${
-                    isSelectedMap 
-                      ? 'bg-slate-900 ring-2 ring-slate-900 shadow-md scale-110' 
-                      : 'bg-indigo-50 text-indigo-500 hover:bg-slate-900 hover:text-white'
-                  }`}>
-                    {activity.type === 'food' ? (
-                      <span className="text-xs">🍜</span>
-                    ) : activity.type === 'checkin' || activity.type === 'hotel' ? (
-                      <span className="text-xs">🏨</span>
-                    ) : activity.type === 'airport' || activity.type === 'transit' ? (
-                      <span className="text-xs">✈️</span>
-                    ) : (
-                      <span className="text-xs">📍</span>
-                    )}
-                  </span>
-
-                  {/* Activity Card */}
-                  <div 
-                    draggable={!isEditing && !activity.id.startsWith("placeholder_")}
-                    onDragStart={(e) => {
-                      setDraggedActivityId(activity.id);
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onDragEnd={() => {
-                      setDraggedActivityId(null);
-                      setDragOverActivityId(null);
-                    }}
-                    onDragOver={(e) => {
-                      if (draggedActivityId && draggedActivityId !== activity.id) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                      }
-                    }}
-                    onDragEnter={() => {
-                      if (draggedActivityId && draggedActivityId !== activity.id) {
-                        setDragOverActivityId(activity.id);
-                      }
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverActivityId === activity.id) {
-                        setDragOverActivityId(null);
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (draggedActivityId && draggedActivityId !== activity.id) {
-                        handleDropActivitySwap(draggedActivityId, activity.id);
-                      }
-                      setDragOverActivityId(null);
-                    }}
-                    className={`p-5 rounded-2xl transition-all duration-200 border cursor-grab active:cursor-grabbing ${
-                      draggedActivityId === activity.id
-                        ? "opacity-45 scale-[0.97] border-indigo-200 bg-slate-50/50"
-                        : dragOverActivityId === activity.id
-                        ? "border-indigo-500 bg-indigo-50/35 scale-[1.01] shadow-md border-dashed ring-2 ring-indigo-400/20"
-                        : isSelectedMap
-                        ? "bg-slate-50 border-slate-300 ring-1 ring-slate-300"
-                        : "bg-white border-slate-100 hover:border-slate-300 hover:shadow-xs shadow-none"
-                    }`}
-                  >
-                    {isEditing ? (
-                      <form onSubmit={(e) => { e.preventDefault(); handleSaveActivityEdit(activity.id); }} className="space-y-3 p-1">
-                        <div className="flex items-center justify-between border-b border-slate-150 pb-2">
-                          <span className="text-xs font-bold text-slate-500 font-mono uppercase">Edit Activity Slot</span>
-                          <button 
-                            type="button" 
-                            onClick={() => handleRemoveActivity(activity.id)}
-                            className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
-                            title="Remove completely"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Remove Attraction
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Time Slot</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none" 
-                              value={editTime}
-                              onChange={(e) => setEditTime(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Opening Hours</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none" 
-                              value={editHours}
-                              placeholder="e.g. 10:00 AM - 10:00 PM"
-                              onChange={(e) => setEditHours(e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Attraction Title</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none font-semibold text-slate-900" 
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Location Search Name</label>
-                            <input 
-                              type="text" 
-                              className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none" 
-                              value={editLocation}
-                              onChange={(e) => setEditLocation(e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Budget / Ticket Price</label>
-                          <input 
-                            type="text" 
-                            className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none" 
-                            value={editBudget}
-                            onChange={(e) => setEditBudget(e.target.value)}
-                            placeholder="e.g. ¥1,500 - ¥3,000"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Schedule Label</label>
-                          <select 
-                            className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none" 
-                            value={editLabel}
-                            onChange={(e) => setEditLabel(e.target.value)}
-                          >
-                            <option value="Want-to-go">Want-to-go</option>
-                            <option value="Flight">Flight</option>
-                            <option value="Hotel">Hotel</option>
-                            <option value="AI suggested">AI suggested</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Description / Notes</label>
-                          <textarea 
-                            className="w-full px-3 py-2 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none h-20 resize-none leading-relaxed" 
-                            value={editDesc}
-                            onChange={(e) => setEditDesc(e.target.value)}
-                          />
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                          <button 
-                            type="button" 
-                            onClick={() => setEditingActivityId(null)}
-                            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl text-xs font-semibold transition cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                          <button 
-                            type="submit" 
-                            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-                          >
-                            Save Changes
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        {/* Header line */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
-                              {activity.time}
-                            </span>
-                            {renderLabelBadge(activity, trip)}
-                            {activity.openingHours && (
-                              <span className="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {activity.openingHours}
-                              </span>
+                      return (
+                        <div key={activity.id} className="relative group">
+                          {/* Timeline bullet indicator */}
+                          <span className={`absolute -left-10 top-1 w-8 h-8 rounded-full border-4 border-white flex items-center justify-center transition-all ${isSelectedMap
+                            ? 'bg-slate-900 ring-2 ring-slate-900 shadow-md scale-110'
+                            : 'bg-indigo-50 text-indigo-500 hover:bg-slate-900 hover:text-white'
+                            }`}>
+                            {activity.type === 'food' ? (
+                              <span className="text-xs">🍜</span>
+                            ) : activity.type === 'checkin' || activity.type === 'hotel' ? (
+                              <span className="text-xs">🏨</span>
+                            ) : activity.type === 'airport' || activity.type === 'transit' ? (
+                              <span className="text-xs">✈️</span>
+                            ) : (
+                              <span className="text-xs">📍</span>
                             )}
-                            {activity.budgetRange && (
-                              <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-0.5">
-                                <DollarSign className="w-3 h-3" />
-                                {convertPriceString(activity.budgetRange, activeDayCurrency, displayCurrency)}
-                              </span>
-                            )}
-                          </div>
+                          </span>
 
-                          {/* Micro interaction bar */}
-                          <div className="flex items-center gap-1 self-end md:self-auto">
-                            {/* Move Up Button */}
-                            {(() => {
-                              const globalIndex = activeDay ? activeDay.activities.findIndex(a => a.id === activity.id) : -1;
-                              const canMoveUp = globalIndex > 0;
-                              return canMoveUp && (
-                                <button
-                                  onClick={() => handleMoveActivity(activity.id, "up")}
-                                  className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-650 transition-colors cursor-pointer"
-                                  title="Move Up (Swap Order)"
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                </button>
-                              );
-                            })()}
-
-                            {/* Move Down Button */}
-                            {(() => {
-                              const globalIndex = activeDay ? activeDay.activities.findIndex(a => a.id === activity.id) : -1;
-                              const canMoveDown = globalIndex >= 0 && globalIndex < (activeDay?.activities?.length || 0) - 1;
-                              return canMoveDown && (
-                                <button
-                                  onClick={() => handleMoveActivity(activity.id, "down")}
-                                  className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-650 transition-colors cursor-pointer"
-                                  title="Move Down (Swap Order)"
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                </button>
-                              );
-                            })()}
-
-                            {/* Edit Button */}
-                            <button
-                              onClick={() => handleStartEdit(activity)}
-                              className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-600 transition-colors cursor-pointer"
-                              title="Edit Activity Inline"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => handleRemoveActivity(activity.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-650 transition-colors cursor-pointer"
-                              title="Delete Activity"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Title and location clickable */}
-                        <div className="mt-3">
-                          <button
-                            onClick={() => handleFocusLocation(activity.location)}
-                            className="text-left font-medium text-slate-950 hover:text-indigo-600 transition flex items-center gap-1.5 cursor-pointer"
-                          >
-                            {activity.title}
-                            <MapPin className="w-4 h-4 text-slate-450" />
-                          </button>
-                          <p className="text-xs text-slate-400 mt-1 font-mono font-medium">
-                            {activity.location}
-                          </p>
-                          <p className="text-sm text-slate-500 mt-2 font-normal leading-relaxed">
-                            {activity.description}
-                          </p>
-                        </div>
-
-                        {/* Alternative Recommendation Section */}
-                        <div className="mt-4 border-t border-slate-100 pt-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (expandedAltActivityId === activity.id) {
-                                setExpandedAltActivityId(null);
-                              } else {
-                                if (alternativesMap[activity.id]) {
-                                  setExpandedAltActivityId(activity.id);
-                                } else {
-                                  fetchAlternativesForActivity(activity);
-                                }
+                          {/* Activity Card */}
+                          <div
+                            draggable={!isEditing}
+                            onDragStart={(e) => {
+                              setDraggedActivityId(activity.id);
+                              e.dataTransfer.effectAllowed = "move";
+                            }}
+                            onDragEnd={() => {
+                              setDraggedActivityId(null);
+                              setDragOverActivityId(null);
+                            }}
+                            onDragOver={(e) => {
+                              if (draggedActivityId && draggedActivityId !== activity.id) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
                               }
                             }}
-                            className="w-full flex items-center justify-between px-3 py-2 bg-indigo-50/50 hover:bg-slate-100/80 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                            onDragEnter={() => {
+                              if (draggedActivityId && draggedActivityId !== activity.id) {
+                                setDragOverActivityId(activity.id);
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverActivityId === activity.id) {
+                                setDragOverActivityId(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (draggedActivityId && draggedActivityId !== activity.id) {
+                                handleDropActivitySwap(draggedActivityId, activity.id);
+                              }
+                              setDragOverActivityId(null);
+                            }}
+                            className={`p-5 rounded-2xl transition-all duration-200 border cursor-grab active:cursor-grabbing ${draggedActivityId === activity.id
+                              ? "opacity-45 scale-[0.97] border-indigo-200 bg-slate-50/50"
+                              : dragOverActivityId === activity.id
+                                ? "border-indigo-500 bg-indigo-50/35 scale-[1.01] shadow-md border-dashed ring-2 ring-indigo-400/20"
+                                : isSelectedMap
+                                  ? "bg-slate-50 border-slate-300 ring-1 ring-slate-300"
+                                  : "bg-white border-slate-100 hover:border-slate-300 hover:shadow-xs shadow-none"
+                              }`}
                           >
-                            <span className="flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5" />
-                              {expandedAltActivityId === activity.id ? "Hide Alternative Options" : "✨ Explore Alternative Choices for This Slot"}
-                            </span>
-                            <span className="text-[10px] font-mono font-bold bg-white text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100">
-                              AI Sourced
-                            </span>
-                          </button>
-
-                          {expandedAltActivityId === activity.id && (
-                            <div className="mt-3 p-3 bg-slate-50 rounded-2xl border border-slate-150 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-slate-500 font-mono uppercase tracking-widest">
-                                  Alternative Ideas
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => fetchAlternativesForActivity(activity, true)}
-                                  disabled={alternativesLoading}
-                                  className="text-xs text-indigo-605 hover:text-indigo-850 text-indigo-600 hover:text-indigo-850 font-bold flex items-center gap-1.5 bg-white border border-slate-200 hover:border-slate-305 px-2.5 py-1 rounded-xl shadow-xs transition duration-150 cursor-pointer disabled:opacity-50"
-                                >
-                                  {alternativesLoading ? (
-                                    <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
-                                  ) : (
-                                    <Sparkles className="w-3 h-3" />
-                                  )}
-                                  <span>Next Options ➡️</span>
-                                </button>
-                              </div>
-
-                              {alternativesLoading && !alternativesMap[activity.id] ? (
-                                <div className="flex flex-col items-center justify-center py-6 gap-2 bg-white rounded-xl border border-dashed border-slate-205">
-                                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-                                  <span className="text-[11px] font-bold text-slate-500 font-mono">Consulting personal AI Travel Agent...</span>
+                            {isEditing ? (
+                              <form onSubmit={(e) => { e.preventDefault(); handleSaveActivityEdit(activity.id); }} className="space-y-3 p-1">
+                                <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+                                  <span className="text-xs font-bold text-slate-500 font-mono uppercase">Edit Activity Slot</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveActivity(activity.id)}
+                                    className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
+                                    title="Remove completely"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Remove Attraction
+                                  </button>
                                 </div>
-                              ) : (
-                                <div className="grid grid-cols-1 gap-3">
-                                  {(alternativesMap[activity.id] || []).map((altChoice: any, idx: number) => (
-                                    <div key={altChoice.id || idx} className="bg-white p-3.5 rounded-xl border border-slate-150 shadow-xs flex flex-col justify-between gap-3 transition">
-                                      <div className="flex items-center justify-between flex-wrap gap-2">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                                            {altChoice.type || "sightseeing"}
-                                          </span>
-                                          {altChoice.openingHours && (
-                                            <span className="text-[9px] font-bold bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded">
-                                              {altChoice.openingHours}
-                                            </span>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Time Slot</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="time"
+                                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+                                        value={editStartTime}
+                                        onChange={(e) => setEditStartTime(e.target.value)}
+                                      />
+                                      <span className="text-slate-400 text-[10px] shrink-0 font-mono">TO</span>
+                                      <input
+                                        type="time"
+                                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+                                        value={editEndTime}
+                                        onChange={(e) => setEditEndTime(e.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Opening Hours</label>
+                                    <input
+                                      type="text"
+                                      className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+                                      value={editHours}
+                                      placeholder="e.g. 10:00 AM - 10:00 PM"
+                                      onChange={(e) => setEditHours(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Attraction Title</label>
+                                  <input
+                                    type="text"
+                                    className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none font-semibold text-slate-900"
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {/* Route Start: From */}
+                                  <div className="space-y-1 relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">From (Custom Route Start)</label>
+                                    <div className="relative">
+                                      <input
+                                        type="text"
+                                        placeholder="Default: previous activity/hotel"
+                                        className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none"
+                                        value={editTransitOrigin}
+                                        onFocus={() => fetchLocationSuggestions(editTitle, editTransitOrigin, "editOrigin")}
+                                        onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                                        onChange={(e) => {
+                                          setEditTransitOrigin(e.target.value);
+                                          fetchLocationSuggestions(editTitle, e.target.value, "editOrigin");
+                                        }}
+                                      />
+                                      {showLocDropdown && activeLocField === "editOrigin" && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                          {isSearchingLoc && (
+                                            <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-400 font-medium">
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                                              <span>Searching places...</span>
+                                            </div>
                                           )}
-                                          {altChoice.budgetRange && (
-                                            <span className="text-[9px] font-bold bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded">
-                                              {altChoice.budgetRange}
-                                            </span>
+                                          {!isSearchingLoc && locSuggestions.length === 0 && (
+                                            <div className="px-3 py-2 text-[11px] text-slate-500 italic">
+                                              No suggestions. Type to search...
+                                            </div>
                                           )}
+                                          {locSuggestions.map((s, idx) => (
+                                            <button
+                                              key={idx}
+                                              type="button"
+                                              onMouseDown={() => {
+                                                setEditTransitOrigin(s.name + (s.address ? `, ${s.address}` : ""));
+                                                setShowLocDropdown(false);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[11px] text-slate-700 font-semibold cursor-pointer flex flex-col gap-0.5 transition"
+                                            >
+                                              <span className="text-slate-900 font-bold flex items-center gap-1">
+                                                📍 {s.name}
+                                              </span>
+                                              {s.address && (
+                                                <span className="text-[9px] text-slate-400 pl-3.5 truncate">
+                                                  {s.address}
+                                                </span>
+                                              )}
+                                            </button>
+                                          ))}
                                         </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Route End: To */}
+                                  <div className="space-y-1 relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">To (Attraction Location)</label>
+                                    <div className="relative">
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Shinjuku Gyoen, Tokyo"
+                                        className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none"
+                                        value={editLocation}
+                                        onFocus={() => fetchLocationSuggestions(editTitle, editLocation, "edit")}
+                                        onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                                        onChange={(e) => {
+                                          setEditLocation(e.target.value);
+                                          fetchLocationSuggestions(editTitle, e.target.value, "edit");
+                                        }}
+                                      />
+                                      {showLocDropdown && activeLocField === "edit" && (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                          {isSearchingLoc && (
+                                            <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-400 font-medium">
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                                              <span>Searching places...</span>
+                                            </div>
+                                          )}
+                                          {!isSearchingLoc && locSuggestions.length === 0 && (
+                                            <div className="px-3 py-2 text-[11px] text-slate-500 italic">
+                                              No suggestions. Type to search...
+                                            </div>
+                                          )}
+                                          {locSuggestions.map((s, idx) => (
+                                            <button
+                                              key={idx}
+                                              type="button"
+                                              onMouseDown={() => {
+                                                setEditLocation(s.name + (s.address ? `, ${s.address}` : ""));
+                                                setShowLocDropdown(false);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[11px] text-slate-700 font-semibold cursor-pointer flex flex-col gap-0.5 transition"
+                                            >
+                                              <span className="text-slate-900 font-bold flex items-center gap-1">
+                                                📍 {s.name}
+                                              </span>
+                                              {s.address && (
+                                                <span className="text-[9px] text-slate-400 pl-3.5 truncate">
+                                                  {s.address}
+                                                </span>
+                                              )}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Budget / Ticket Price</label>
+                                  <input
+                                    type="text"
+                                    className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none"
+                                    value={editBudget}
+                                    onChange={(e) => setEditBudget(e.target.value)}
+                                    placeholder="e.g. ¥1,500 - ¥3,000"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Schedule Label</label>
+                                  <select
+                                    className="w-full px-3 py-1.5 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none"
+                                    value={editLabel}
+                                    onChange={(e) => setEditLabel(e.target.value)}
+                                  >
+                                    <option value="Want-to-go">Want-to-go</option>
+                                    <option value="Flight">Flight</option>
+                                    <option value="Hotel">Hotel</option>
+                                    <option value="AI suggested">AI suggested</option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Description / Notes</label>
+                                  <textarea
+                                    className="w-full px-3 py-2 text-xs bg-slate-50 text-slate-800 border border-slate-205 focus:border-indigo-500 rounded-xl outline-none h-20 resize-none leading-relaxed"
+                                    value={editDesc}
+                                    onChange={(e) => setEditDesc(e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingActivityId(null)}
+                                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                                  >
+                                    Save Changes
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                {/* Header line */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md">
+                                      {activity.time}
+                                    </span>
+                                    {renderLabelBadge(activity, trip)}
+                                    {activity.openingHours && (
+                                      <span className="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {activity.openingHours}
+                                      </span>
+                                    )}
+                                    {activity.budgetRange && (
+                                      <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded flex items-center gap-0.5">
+                                        <DollarSign className="w-3 h-3" />
+                                        {convertPriceString(activity.budgetRange, activeDayCurrency, displayCurrency)}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Micro interaction bar */}
+                                  <div className="flex items-center gap-1 self-end md:self-auto">
+                                    {/* Move Up Button */}
+                                    {(() => {
+                                      const globalIndex = activeDay ? activeDay.activities.findIndex(a => a.id === activity.id) : -1;
+                                      const canMoveUp = globalIndex > 0;
+                                      return canMoveUp && (
+                                        <button
+                                          onClick={() => handleMoveActivity(activity.id, "up")}
+                                          className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                                          title="Move Up (Swap Order)"
+                                        >
+                                          <ArrowUp className="w-3.5 h-3.5" />
+                                        </button>
+                                      );
+                                    })()}
+
+                                    {/* Move Down Button */}
+                                    {(() => {
+                                      const globalIndex = activeDay ? activeDay.activities.findIndex(a => a.id === activity.id) : -1;
+                                      const canMoveDown = globalIndex >= 0 && globalIndex < (activeDay?.activities?.length || 0) - 1;
+                                      return canMoveDown && (
+                                        <button
+                                          onClick={() => handleMoveActivity(activity.id, "down")}
+                                          className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                                          title="Move Down (Swap Order)"
+                                        >
+                                          <ArrowDown className="w-3.5 h-3.5" />
+                                        </button>
+                                      );
+                                    })()}
+
+                                    {/* Edit Button */}
+                                    <button
+                                      onClick={() => handleStartEdit(activity)}
+                                      className="p-1.5 rounded-lg text-slate-450 hover:bg-slate-100 hover:text-indigo-600 transition-colors cursor-pointer"
+                                      title="Edit Activity Inline"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Delete Button */}
+                                    <button
+                                      onClick={() => handleRemoveActivity(activity.id)}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                                      title="Delete Activity"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Title and location clickable */}
+                                <div className="mt-3">
+                                  <button
+                                    onClick={() => handleFocusLocation(activity.location)}
+                                    className="text-left font-medium text-slate-950 hover:text-indigo-600 transition flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    {activity.title}
+                                    <MapPin className="w-4 h-4 text-slate-450" />
+                                  </button>
+                                  <p className="text-xs text-slate-400 mt-1 font-mono font-medium">
+                                    {activity.location}
+                                  </p>
+                                  <p className="text-sm text-slate-500 mt-2 font-normal leading-relaxed">
+                                    {activity.description}
+                                  </p>
+                                </div>
+
+                                {/* Alternative Recommendation Section */}
+                                <div className="mt-4 border-t border-slate-100 pt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (expandedAltActivityId === activity.id) {
+                                        setExpandedAltActivityId(null);
+                                      } else {
+                                        if (alternativesMap[activity.id]) {
+                                          setExpandedAltActivityId(activity.id);
+                                        } else {
+                                          fetchAlternativesForActivity(activity);
+                                        }
+                                      }
+                                    }}
+                                    className="w-full flex items-center justify-between px-3 py-2 bg-indigo-50/50 hover:bg-slate-100/80 text-indigo-700 hover:text-indigo-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                                  >
+                                    <span className="flex items-center gap-1.5">
+                                      <Sparkles className="w-3.5 h-3.5" />
+                                      {expandedAltActivityId === activity.id ? "Hide Alternative Options" : "✨ Explore Alternative Choices for This Slot"}
+                                    </span>
+                                    <span className="text-[10px] font-mono font-bold bg-white text-indigo-600 px-2 py-0.5 rounded-md border border-indigo-100">
+                                      AI Sourced
+                                    </span>
+                                  </button>
+
+                                  {expandedAltActivityId === activity.id && (
+                                    <div className="mt-3 p-3 bg-slate-50 rounded-2xl border border-slate-150 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-slate-500 font-mono uppercase tracking-widest">
+                                          Alternative Ideas
+                                        </span>
                                         <button
                                           type="button"
-                                          onClick={() => handleSwapActivity(activity.id, altChoice)}
-                                          className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                                          onClick={() => fetchAlternativesForActivity(activity, true)}
+                                          disabled={alternativesLoading}
+                                          className="text-xs text-indigo-605 hover:text-indigo-850 text-indigo-600 hover:text-indigo-850 font-bold flex items-center gap-1.5 bg-white border border-slate-200 hover:border-slate-305 px-2.5 py-1 rounded-xl shadow-xs transition duration-150 cursor-pointer disabled:opacity-50"
                                         >
-                                          Swap with This ✅
+                                          {alternativesLoading ? (
+                                            <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />
+                                          ) : (
+                                            <Sparkles className="w-3 h-3" />
+                                          )}
+                                          <span>Next Options ➡️</span>
                                         </button>
                                       </div>
 
-                                      <div>
-                                        <h4 className="text-xs font-bold text-slate-900 transition">
-                                          {altChoice.title}
-                                        </h4>
-                                        <span className="text-[9px] text-slate-450 font-bold block mt-0.5">
-                                          📍 {altChoice.location}
-                                        </span>
-                                        <p className="text-[11px] text-slate-500 leading-normal mt-1">
-                                          {altChoice.description}
-                                        </p>
-                                      </div>
+                                      {alternativesLoading && !alternativesMap[activity.id] ? (
+                                        <div className="flex flex-col items-center justify-center py-6 gap-2 bg-white rounded-xl border border-dashed border-slate-205">
+                                          <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                                          <span className="text-[11px] font-bold text-slate-500 font-mono">Consulting personal AI Travel Agent...</span>
+                                        </div>
+                                      ) : (
+                                        <div className="grid grid-cols-1 gap-3">
+                                          {(alternativesMap[activity.id] || []).map((altChoice: any, idx: number) => (
+                                            <div key={altChoice.id || idx} className="bg-white p-3.5 rounded-xl border border-slate-150 shadow-xs flex flex-col justify-between gap-3 transition">
+                                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                                                    {altChoice.type || "sightseeing"}
+                                                  </span>
+                                                  {altChoice.openingHours && (
+                                                    <span className="text-[9px] font-bold bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded">
+                                                      {altChoice.openingHours}
+                                                    </span>
+                                                  )}
+                                                  {altChoice.budgetRange && (
+                                                    <span className="text-[9px] font-bold bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded">
+                                                      {altChoice.budgetRange}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSwapActivity(activity.id, altChoice)}
+                                                  className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                                                >
+                                                  Swap with This ✅
+                                                </button>
+                                              </div>
 
-                                      {altChoice.transportation && (
-                                        <div className="text-[9px] font-medium text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 flex items-center gap-1 flex-wrap">
-                                          <span className="font-bold text-slate-400">Est. Commute:</span>
-                                          <span className="font-bold text-indigo-650">{altChoice.transportation.mode}</span>
-                                          <span className="text-slate-400">({altChoice.transportation.duration})</span>
-                                          {altChoice.transportation.distance && (
-                                            <span className="bg-slate-200 text-slate-700 px-1 rounded font-bold font-mono text-[8px]">
-                                              {altChoice.transportation.distance}
-                                            </span>
+                                              <div>
+                                                <h4 className="text-xs font-bold text-slate-900 transition">
+                                                  {altChoice.title}
+                                                </h4>
+                                                <span className="text-[9px] text-slate-450 font-bold block mt-0.5">
+                                                  📍 {altChoice.location}
+                                                </span>
+                                                <p className="text-[11px] text-slate-500 leading-normal mt-1">
+                                                  {altChoice.description}
+                                                </p>
+                                              </div>
+
+                                              {altChoice.transportation && (
+                                                <div className="text-[9px] font-medium text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 flex items-center gap-1 flex-wrap">
+                                                  <span className="font-bold text-slate-400">Est. Commute:</span>
+                                                  <span className="font-bold text-indigo-600">{altChoice.transportation.mode}</span>
+                                                  <span className="text-slate-400">({altChoice.transportation.duration})</span>
+                                                  {altChoice.transportation.distance && (
+                                                    <span className="bg-slate-200 text-slate-700 px-1 rounded font-bold font-mono text-[8px]">
+                                                      {altChoice.transportation.distance}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {!(alternativesMap[activity.id]?.length) && (
+                                            <div className="text-xs font-semibold text-slate-400 italic text-center py-4">
+                                              Generating alternative suggestions...
+                                            </div>
                                           )}
                                         </div>
                                       )}
                                     </div>
-                                  ))}
-                                  {!(alternativesMap[activity.id]?.length) && (
-                                    <div className="text-xs font-semibold text-slate-400 italic text-center py-4">
-                                      Generating alternative suggestions...
-                                    </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
 
-                        {/* Transit options bar container */}
-                        <div className="mt-4 pt-4 border-t border-slate-100/80">
+                                {/* Transit options bar container */}
+                                <div className="mt-4 pt-4 border-t border-slate-100/80">
 
-                          {/* Transit options bar underneath if applicable */}
-                          {(() => {
-                            const idx = activeDay?.activities?.findIndex(a => a.id === activity.id) ?? -1;
-                            const isArrivalStart = idx === 0 && (
-                              activity.type === "airport" ||
-                              (activity.title || "").toLowerCase().includes("flight") ||
-                              (activity.title || "").toLowerCase().includes("arrive") ||
-                              (activity.title || "").toLowerCase().includes("landing") ||
-                              (activity.title || "").toLowerCase().includes("airport") ||
-                              (activity.location || "").toLowerCase().includes("airport")
-                            );
-                            if (isArrivalStart) return null;
+                                  {/* Transit options bar underneath if applicable */}
+                                  {(() => {
+                                    const idx = activeDay?.activities?.findIndex(a => a.id === activity.id) ?? -1;
+                                    const isArrivalStart = idx === 0 && (
+                                      activity.type === "airport" ||
+                                      (activity.title || "").toLowerCase().includes("flight") ||
+                                      (activity.title || "").toLowerCase().includes("arrive") ||
+                                      (activity.title || "").toLowerCase().includes("landing") ||
+                                      (activity.title || "").toLowerCase().includes("airport") ||
+                                      (activity.location || "").toLowerCase().includes("airport")
+                                    );
+                                    if (isArrivalStart) return null;
 
-                            const origin = getOriginLocationForActivity(activity.id);
-                            const isSamePlace = origin && activity.location && (origin.trim().toLowerCase() === activity.location.trim().toLowerCase());
-                            if (isSamePlace) return null;
+                                    const origin = getOriginLocationForActivity(activity.id);
+                                    const isSamePlace = origin && activity.location && (origin.trim().toLowerCase() === activity.location.trim().toLowerCase());
+                                    if (isSamePlace) return null;
 
-                            const { from, to } = getTransitPointsForActivity(activity.id);
-                            return (
-                              <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
-                                {/* Route endpoints label row */}
-                                <div className="flex flex-wrap items-center gap-1.5 bg-indigo-50/40 border border-indigo-100/50 p-2 px-3 rounded-2xl text-[11px] text-slate-700 shadow-3xs">
-                                  <span className="text-indigo-600 font-bold uppercase tracking-wider text-[9px] font-mono bg-indigo-100/80 px-1.5 py-0.5 rounded-md">Route</span>
-                                  <span className="font-extrabold truncate max-w-[130px] sm:max-w-xs text-slate-800" title={from}>{from}</span>
-                                  <span className="text-indigo-400 font-black px-1">➔</span>
-                                  <span className="font-extrabold truncate max-w-[130px] sm:max-w-xs text-slate-900" title={to}>{to}</span>
+                                    const { from, to } = getTransitPointsForActivity(activity.id);
+                                    return (
+                                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                                        {/* Route endpoints label row */}
+                                        <div className="flex flex-wrap items-center gap-1.5 bg-indigo-50/40 border border-indigo-100/50 p-2 px-3 rounded-2xl text-[11px] text-slate-700 shadow-3xs">
+                                          <span className="text-indigo-600 font-bold uppercase tracking-wider text-[9px] font-mono bg-indigo-100/80 px-1.5 py-0.5 rounded-md">Route</span>
+                                          <span className="font-extrabold truncate max-w-[130px] sm:max-w-xs text-slate-800" title={from}>{from}</span>
+                                          <span className="text-indigo-400 font-black px-1">➔</span>
+                                          <span className="font-extrabold truncate max-w-[130px] sm:max-w-xs text-slate-900" title={to}>{to}</span>
+                                        </div>
+
+                                        <div className="text-[11px] font-medium text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                          {/* Left: Commute Mode info/pill */}
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <Navigation className="w-3.5 h-3.5 text-indigo-500" strokeWidth={2.5} />
+                                            {!activity.preferredTransportMode ? (
+                                              <span className="text-[11px] font-extrabold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg">
+                                                (select transportation method)
+                                              </span>
+                                            ) : (
+                                              <>
+                                                <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold" title={activity.transportation?.details}>
+                                                  {activity.transportation?.mode || (activity.preferredTransportMode === "walking" ? "Walking" : activity.preferredTransportMode === "driving" ? "Taxi/Car" : "Transit")}
+                                                </span>
+                                                <span className="text-slate-400 font-mono font-bold">({activity.transportation?.duration || "Tap mode below to calculate"})</span>
+                                                {activity.transportation?.distance && (
+                                                  <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" title="Est. Geographic Distance">
+                                                    {activity.transportation.distance}
+                                                  </span>
+                                                )}
+                                                {activity.transportation?.cost && (
+                                                  <span className="text-teal-600 font-bold bg-teal-50/60 px-1.5 py-0.5 rounded">
+                                                    {convertPriceString(activity.transportation.cost, activeDayCurrency, displayCurrency)}
+                                                  </span>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+
+                                          {/* Right: Toggle Button Group */}
+                                          <div className="flex items-center gap-1 shrink-0 bg-slate-100 border border-slate-200/60 p-0.5 rounded-lg self-end sm:self-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleActivityTransitMode(activity.id, "transit")}
+                                              disabled={updatingTransitIds[activity.id]}
+                                              className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${activity.preferredTransportMode === "transit"
+                                                ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
+                                                : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
+                                                }`}
+                                              title="Calculate commute via public transit"
+                                            >
+                                              🚇 Transit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleActivityTransitMode(activity.id, "driving")}
+                                              disabled={updatingTransitIds[activity.id]}
+                                              className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${activity.preferredTransportMode === "driving"
+                                                ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
+                                                : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
+                                                }`}
+                                              title="Calculate commute via driving/taxi/rental car"
+                                            >
+                                              🚗 Taxi/Car
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleActivityTransitMode(activity.id, "walking")}
+                                              disabled={updatingTransitIds[activity.id]}
+                                              className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${activity.preferredTransportMode === "walking"
+                                                ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
+                                                : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
+                                                }`}
+                                              title="Calculate commute via walking"
+                                            >
+                                              🚶 Walk
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
-
-                                <div className="text-[11px] font-medium text-slate-500 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                  {/* Left: Commute Mode info/pill */}
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <Navigation className="w-3.5 h-3.5 text-indigo-500" strokeWidth={2.5} />
-                                    {!activity.preferredTransportMode ? (
-                                      <span className="text-[11px] font-extrabold text-amber-650 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-lg">
-                                        (select transportation method)
-                                      </span>
-                                    ) : (
-                                      <>
-                                        {activity.preferredTransportMode === "walking" && (
-                                          <span className="text-[10px] bg-emerald-50 text-emerald-705 px-2 py-0.5 rounded font-extrabold border border-emerald-200">
-                                            🚶 Walkable Route
-                                          </span>
-                                        )}
-                                        <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold" title={activity.transportation?.details}>
-                                          {activity.transportation?.mode || (activity.preferredTransportMode === "walking" ? "Walking" : activity.preferredTransportMode === "driving" ? "Taxi/Car" : "Transit")}
-                                        </span>
-                                        <span className="text-slate-400 font-mono font-bold">({activity.transportation?.duration || "Tap mode below to calculate"})</span>
-                                        {activity.transportation?.distance && (
-                                          <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold" title="Est. Geographic Distance">
-                                            {activity.transportation.distance}
-                                          </span>
-                                        )}
-                                        {activity.transportation?.cost && (
-                                          <span className="text-teal-600 font-bold bg-teal-50/60 px-1.5 py-0.5 rounded">
-                                            {convertPriceString(activity.transportation.cost, activeDayCurrency, displayCurrency)}
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
- 
-                                  {/* Right: Toggle Button Group */}
-                                  <div className="flex items-center gap-1 shrink-0 bg-slate-100 border border-slate-200/60 p-0.5 rounded-lg self-end sm:self-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleActivityTransitMode(activity.id, "transit")}
-                                      disabled={updatingTransitIds[activity.id]}
-                                      className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
-                                        activity.preferredTransportMode === "transit"
-                                          ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
-                                          : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
-                                      }`}
-                                      title="Calculate commute via public transit"
-                                    >
-                                      🚇 Transit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleActivityTransitMode(activity.id, "driving")}
-                                      disabled={updatingTransitIds[activity.id]}
-                                      className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
-                                        activity.preferredTransportMode === "driving"
-                                          ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
-                                          : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
-                                      }`}
-                                      title="Calculate commute via driving/taxi/rental car"
-                                    >
-                                      🚗 Taxi/Car
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleActivityTransitMode(activity.id, "walking")}
-                                      disabled={updatingTransitIds[activity.id]}
-                                      className={`px-2 py-1 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
-                                        activity.preferredTransportMode === "walking"
-                                          ? "bg-white text-slate-900 border border-slate-200 shadow-3xs"
-                                          : "text-slate-500 hover:text-slate-805 disabled:opacity-40"
-                                      }`}
-                                      title="Calculate commute via walking"
-                                    >
-                                      🚶 Walk
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </>
-                    )}
-                  </div>
- 
-                  {trip.hasUserEdits && travelWarnings
-                    .filter(w => w.prevActivityId === activity.id)
-                    .map((w, wIdx) => {
-                      const isImp = w.isImpossible;
-                      return (
-                        <div 
-                          key={wIdx} 
-                          className={`my-4 ml-6 pl-4 border-l-4 rounded-r-xl p-3 text-xs shadow-xs animate-fade-in flex flex-col gap-1 ring-1 ${
-                            isImp 
-                              ? "border-rose-500 bg-rose-50/75 text-rose-950 ring-rose-200"
-                              : "border-amber-500 bg-amber-50/60 text-amber-950 ring-amber-200"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className={`w-4 h-4 shrink-0 ${isImp ? "text-rose-600 animate-pulse" : "text-amber-600"}`} />
-                            <span className={`font-black uppercase tracking-widest font-mono text-[9px] ${isImp ? "text-rose-800" : "text-amber-800"}`}>
-                              {isImp ? "Transit Feasibility Warning — IMPOSSIBLE" : "Transit Feasibility Warning"}
-                            </span>
+                              </>
+                            )}
                           </div>
-                          <p className={`text-[11px] leading-relaxed font-semibold ${isImp ? "text-rose-700" : "text-amber-700"}`}>
-                            {w.message}
-                          </p>
+
+                          {trip.hasUserEdits && travelWarnings
+                            .filter(w => w.prevActivityId === activity.id)
+                            .map((w, wIdx) => {
+                              const isImp = w.isImpossible;
+                              return (
+                                <div
+                                  key={wIdx}
+                                  className={`my-4 ml-6 pl-4 border-l-4 rounded-r-xl p-3 text-xs shadow-xs animate-fade-in flex flex-col gap-1 ring-1 ${isImp
+                                    ? "border-rose-500 bg-rose-50/75 text-rose-950 ring-rose-200"
+                                    : "border-amber-500 bg-amber-50/60 text-amber-950 ring-amber-200"
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className={`w-4 h-4 shrink-0 ${isImp ? "text-rose-600 animate-pulse" : "text-amber-600"}`} />
+                                    <span className={`font-black uppercase tracking-widest font-mono text-[9px] ${isImp ? "text-rose-800" : "text-amber-800"}`}>
+                                      {isImp ? "Transit Feasibility Warning — IMPOSSIBLE" : "Transit Feasibility Warning"}
+                                    </span>
+                                  </div>
+                                  <p className={`text-[11px] leading-relaxed font-semibold ${isImp ? "text-rose-700" : "text-amber-700"}`}>
+                                    {w.message}
+                                  </p>
+                                </div>
+                              );
+                            })}
                         </div>
                       );
                     })}
-                </div>
-              );
-            })}
                   </div>
                 </div>
               );
@@ -2670,7 +2677,8 @@ export default function ItineraryDisplay({
                 <button
                   onClick={() => {
                     setIsAddingActivity(true);
-                    setNewActTime("10:00 AM");
+                    setNewActStartTime("10:00");
+                    setNewActEndTime("11:30");
                   }}
                   className="w-full py-3 border-2 border-dashed border-slate-200 hover:border-indigo-500 text-slate-500 hover:text-indigo-600 rounded-2xl text-xs font-bold tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 bg-slate-50/20"
                 >
@@ -2680,10 +2688,10 @@ export default function ItineraryDisplay({
                 <form onSubmit={handleAddNewActivity} className="bg-slate-50/50 p-5 border border-slate-200 rounded-2xl space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest font-mono">Create Custom Schedule Item</span>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setIsAddingActivity(false)}
-                      className="text-slate-400 hover:text-slate-650 font-bold text-xs"
+                      className="text-slate-400 hover:text-slate-600 font-bold text-xs"
                     >
                       Close Form
                     </button>
@@ -2691,19 +2699,27 @@ export default function ItineraryDisplay({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Time Slot (e.g. 09:00 AM - 11:30 AM)</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. 10:00 AM"
-                        value={newActTime}
-                        onChange={(e) => setNewActTime(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
-                      />
+                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Time Slot</label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={newActStartTime}
+                          onChange={(e) => setNewActStartTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none text-slate-800"
+                        />
+                        <span className="text-slate-400 text-[10px] shrink-0 font-mono">TO</span>
+                        <input
+                          type="time"
+                          value={newActEndTime}
+                          onChange={(e) => setNewActEndTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none text-slate-800"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Operating Hours / Ticket Fee</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="e.g. 24 Hours / Free"
                         value={newActHours}
                         onChange={(e) => setNewActHours(e.target.value)}
@@ -2712,35 +2728,133 @@ export default function ItineraryDisplay({
                     </div>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Activity/Food/Hotel Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Premium Ramen Lunch"
+                      value={newActTitle}
+                      onChange={(e) => setNewActTitle(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none text-slate-900"
+                      required
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Activity/Food/Hotel Title</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Premium Ramen Lunch"
-                        value={newActTitle}
-                        onChange={(e) => setNewActTitle(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none text-slate-900"
-                        required
-                      />
+                    {/* From: Custom Route Start */}
+                    <div className="space-y-1 relative">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">From (Custom Route Start)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Default: previous activity/hotel"
+                          value={newActTransitOrigin}
+                          onFocus={() => fetchLocationSuggestions(newActTitle, newActTransitOrigin, "newOrigin")}
+                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                          onChange={(e) => {
+                            setNewActTransitOrigin(e.target.value);
+                            fetchLocationSuggestions(newActTitle, e.target.value, "newOrigin");
+                          }}
+                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+                        />
+                        {showLocDropdown && activeLocField === "newOrigin" && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {isSearchingLoc && (
+                              <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-400 font-medium">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                                <span>Searching places...</span>
+                              </div>
+                            )}
+                            {!isSearchingLoc && locSuggestions.length === 0 && (
+                              <div className="px-3 py-2 text-[11px] text-slate-500 italic">
+                                No suggestions. Type to search...
+                              </div>
+                            )}
+                            {locSuggestions.map((s, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onMouseDown={() => {
+                                  setNewActTransitOrigin(s.name + (s.address ? `, ${s.address}` : ""));
+                                  setShowLocDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[11px] text-slate-700 font-semibold cursor-pointer flex flex-col gap-0.5 transition"
+                              >
+                                <span className="text-slate-900 font-bold flex items-center gap-1">
+                                  📍 {s.name}
+                                </span>
+                                {s.address && (
+                                  <span className="text-[9px] text-slate-400 pl-3.5 truncate">
+                                    {s.address}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Named Maps Search Location</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Shinjuku Golden Gai, Tokyo"
-                        value={newActLocation}
-                        onChange={(e) => setNewActLocation(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
-                      />
+
+                    {/* To: Attraction Location */}
+                    <div className="space-y-1 relative">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">To (Attraction Location)</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="e.g. Shinjuku Golden Gai, Tokyo"
+                          value={newActLocation}
+                          onFocus={() => fetchLocationSuggestions(newActTitle, newActLocation, "new")}
+                          onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                          onChange={(e) => {
+                            setNewActLocation(e.target.value);
+                            fetchLocationSuggestions(newActTitle, e.target.value, "new");
+                          }}
+                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+                        />
+                        {showLocDropdown && activeLocField === "new" && (
+                          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {isSearchingLoc && (
+                              <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-400 font-medium">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                                <span>Searching places...</span>
+                              </div>
+                            )}
+                            {!isSearchingLoc && locSuggestions.length === 0 && (
+                              <div className="px-3 py-2 text-[11px] text-slate-500 italic">
+                                No suggestions. Type to search...
+                              </div>
+                            )}
+                            {locSuggestions.map((s, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onMouseDown={() => {
+                                  setNewActLocation(s.name + (s.address ? `, ${s.address}` : ""));
+                                  setShowLocDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[11px] text-slate-700 font-semibold cursor-pointer flex flex-col gap-0.5 transition"
+                              >
+                                <span className="text-slate-900 font-bold flex items-center gap-1">
+                                  📍 {s.name}
+                                </span>
+                                {s.address && (
+                                  <span className="text-[9px] text-slate-400 pl-3.5 truncate">
+                                    {s.address}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Estimated Local Cost Range</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="e.g. ¥1,500 - ¥3,000"
                         value={newActBudget}
                         onChange={(e) => setNewActBudget(e.target.value)}
@@ -2749,7 +2863,7 @@ export default function ItineraryDisplay({
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Schedule Label</label>
-                      <select 
+                      <select
                         value={newActLabel}
                         onChange={(e) => setNewActLabel(e.target.value)}
                         className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
@@ -2764,8 +2878,8 @@ export default function ItineraryDisplay({
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Short Description / Travel Tip</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="e.g. Try their traditional spicy red broth. Highly recommended."
                       value={newActDesc}
                       onChange={(e) => setNewActDesc(e.target.value)}
@@ -2774,16 +2888,16 @@ export default function ItineraryDisplay({
                   </div>
 
                   <div className="flex justify-end gap-2 pt-1">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setIsAddingActivity(false)}
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-605 rounded-xl text-xs font-semibold transition cursor-pointer"
                     >
                       Cancel
                     </button>
-                    <button 
-                      type="submit" 
-                      className="px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
                     >
                       Add to Timeline
                     </button>
@@ -2797,9 +2911,9 @@ export default function ItineraryDisplay({
 
       {/* RIGHT: MAPS IFRAME & RESERVATIONS TICKETS (4 Cols) */}
       <div className="lg:col-span-4 space-y-8">
-        
+
         {/* Dynamic Map Component */}
-        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-3">
+        <div id="google-map-section" className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Interactive Map Focus</span>
             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 font-mono text-[9px] uppercase rounded">Keyless Embed</span>
@@ -2825,8 +2939,8 @@ export default function ItineraryDisplay({
         {/* BOOKED FLIGHTS BOARDING PASSES INTERACTIVE */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Airport Boarding Passes ({ (trip.flights || []).length })</span>
-            <button 
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Airport Boarding Passes ({(trip.flights || []).length})</span>
+            <button
               type="button"
               onClick={() => setIsAddingFlight(!isAddingFlight)}
               className="px-2 py-1 text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg uppercase tracking-wider transition flex items-center gap-1 select-none cursor-pointer"
@@ -2845,18 +2959,18 @@ export default function ItineraryDisplay({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Flight No</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. SQ638" 
-                    value={newFlightNo} 
+                  <input
+                    type="text"
+                    placeholder="e.g. SQ638"
+                    value={newFlightNo}
                     onChange={(e) => setNewFlightNo(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-white"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Type</label>
-                  <select 
-                    value={newFlightType} 
+                  <select
+                    value={newFlightType}
                     onChange={(e) => setNewFlightType(e.target.value as "depart" | "return")}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-slate-300"
                   >
@@ -2869,20 +2983,20 @@ export default function ItineraryDisplay({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Origin Airport Code</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. SIN" 
-                    value={newFlightDepAirport} 
+                  <input
+                    type="text"
+                    placeholder="e.g. SIN"
+                    value={newFlightDepAirport}
                     onChange={(e) => setNewFlightDepAirport(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-white"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Dest Airport Code</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. NRT" 
-                    value={newFlightArrAirport} 
+                  <input
+                    type="text"
+                    placeholder="e.g. NRT"
+                    value={newFlightArrAirport}
                     onChange={(e) => setNewFlightArrAirport(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-white"
                   />
@@ -2892,26 +3006,26 @@ export default function ItineraryDisplay({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Departure Date/Time</label>
-                  <input 
-                    type="datetime-local" 
-                    value={newFlightDepTime} 
+                  <input
+                    type="datetime-local"
+                    value={newFlightDepTime}
                     onChange={(e) => setNewFlightDepTime(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-slate-300"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] text-slate-450 uppercase mb-1 font-mono">Arrival Date/Time</label>
-                  <input 
-                    type="datetime-local" 
-                    value={newFlightArrTime} 
+                  <input
+                    type="datetime-local"
+                    value={newFlightArrTime}
                     onChange={(e) => setNewFlightArrTime(e.target.value)}
                     className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl outline-none text-slate-300"
                   />
                 </div>
               </div>
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={!newFlightNo.trim()}
                 className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
               >
@@ -2930,7 +3044,7 @@ export default function ItineraryDisplay({
             <div className="space-y-4">
               {trip.flights.map((flight) => (
                 <div key={flight.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
-                  
+
                   {editingFlightId === flight.id ? (
                     <div className="space-y-3 text-xs bg-white text-slate-850">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -2941,17 +3055,17 @@ export default function ItineraryDisplay({
                       <div className="grid grid-cols-2 gap-2 border-0">
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Flight No</label>
-                          <input 
-                            type="text" 
-                            value={editFlightNo} 
+                          <input
+                            type="text"
+                            value={editFlightNo}
                             onChange={(e) => setEditFlightNo(e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-indigo-500"
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Type</label>
-                          <select 
-                            value={editFlightType} 
+                          <select
+                            value={editFlightType}
                             onChange={(e) => setEditFlightType(e.target.value as "depart" | "return")}
                             className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none focus:border-indigo-500"
                           >
@@ -2964,18 +3078,18 @@ export default function ItineraryDisplay({
                       <div className="grid grid-cols-2 gap-2 border-0">
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Origin</label>
-                          <input 
-                            type="text" 
-                            value={editFlightDepAirport} 
+                          <input
+                            type="text"
+                            value={editFlightDepAirport}
                             onChange={(e) => setEditFlightDepAirport(e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none"
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Destination</label>
-                          <input 
-                            type="text" 
-                            value={editFlightArrAirport} 
+                          <input
+                            type="text"
+                            value={editFlightArrAirport}
                             onChange={(e) => setEditFlightArrAirport(e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 outline-none"
                           />
@@ -2985,18 +3099,18 @@ export default function ItineraryDisplay({
                       <div className="grid grid-cols-2 gap-2 border-0">
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Depart Time</label>
-                          <input 
-                            type="datetime-local" 
-                            value={editFlightDepTime} 
+                          <input
+                            type="datetime-local"
+                            value={editFlightDepTime}
                             onChange={(e) => setEditFlightDepTime(e.target.value)}
                             className="w-full px-2 py-1 text-slate-800 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-500 uppercase font-mono">Arrive Time</label>
-                          <input 
-                            type="datetime-local" 
-                            value={editFlightArrTime} 
+                          <input
+                            type="datetime-local"
+                            value={editFlightArrTime}
                             onChange={(e) => setEditFlightArrTime(e.target.value)}
                             className="w-full px-2 py-1 text-slate-800 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                           />
@@ -3004,13 +3118,13 @@ export default function ItineraryDisplay({
                       </div>
 
                       <div className="flex gap-2 pt-1 border-0">
-                        <button 
+                        <button
                           onClick={() => handleSaveFlightEdit(flight.id)}
                           className="flex-grow py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
                         >
                           Save changes
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRemoveFlight(flight.id)}
                           className="p-2 border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
                         >
@@ -3024,9 +3138,8 @@ export default function ItineraryDisplay({
                         <span className="font-bold font-mono text-slate-950 bg-slate-100 px-2.5 py-1 rounded-lg">
                           ✈️ {flight.flightNo}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider font-mono ${
-                          flight.type === "depart" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-blue-50 text-blue-700 border border-blue-100"
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider font-mono ${flight.type === "depart" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-blue-50 text-blue-700 border border-blue-100"
+                          }`}>
                           {flight.type === "depart" ? "Outbound" : "Return"}
                         </span>
                         <div className="flex items-center gap-1.5 font-bold font-mono text-slate-705">
@@ -3041,10 +3154,10 @@ export default function ItineraryDisplay({
                           <div><strong className="text-slate-700 font-semibold">DEP:</strong> {formatTime(flight.departureTime)}</div>
                           <div><strong className="text-slate-700 font-semibold">ARR:</strong> {formatTime(flight.arrivalTime)}</div>
                         </div>
-                        
-                        <button 
+
+                        <button
                           onClick={() => handleStartEditFlight(flight)}
-                          className="p-1 text-slate-450 hover:text-indigo-650 hover:bg-slate-55 rounded-lg transition"
+                          className="p-1 text-slate-450 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition"
                           title="Edit Flight Entry"
                         >
                           ✎
@@ -3062,8 +3175,8 @@ export default function ItineraryDisplay({
         {/* BOOKED HOTELS INFORMATION WITH ACTIVE EDITORS */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hotel Room Vouchers ({ (trip.hotels || []).length })</span>
-            <button 
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hotel Room Vouchers ({(trip.hotels || []).length})</span>
+            <button
               type="button"
               onClick={() => setIsAddingHotel(!isAddingHotel)}
               className="px-2 py-1 text-[10px] bg-slate-950 hover:bg-slate-850 border border-slate-200 text-slate-800 font-bold rounded-lg uppercase tracking-wider transition flex items-center gap-1 select-none cursor-pointer"
@@ -3081,10 +3194,10 @@ export default function ItineraryDisplay({
 
               <div>
                 <label className="block text-[10px] text-slate-400 uppercase font-mono mb-1">Hotel Title Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Kyoto Ryokan Anzu" 
-                  value={newHotelName} 
+                <input
+                  type="text"
+                  placeholder="e.g. Kyoto Ryokan Anzu"
+                  value={newHotelName}
                   onChange={(e) => setNewHotelName(e.target.value)}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
                 />
@@ -3092,10 +3205,10 @@ export default function ItineraryDisplay({
 
               <div>
                 <label className="block text-[10px] text-slate-400 uppercase font-mono mb-1">Address / Location</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Shimogyo-ku, Kyoto, Japan" 
-                  value={newHotelLocation} 
+                <input
+                  type="text"
+                  placeholder="e.g. Shimogyo-ku, Kyoto, Japan"
+                  value={newHotelLocation}
                   onChange={(e) => setNewHotelLocation(e.target.value)}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
                 />
@@ -3104,28 +3217,28 @@ export default function ItineraryDisplay({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] text-slate-450 uppercase font-mono">Check-In</label>
-                  <input 
-                    type="datetime-local" 
-                    value={newHotelCheckIn} 
+                  <input
+                    type="datetime-local"
+                    value={newHotelCheckIn}
                     onChange={(e) => setNewHotelCheckIn(e.target.value)}
                     className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-slate-450 uppercase font-mono">Check-Out</label>
-                  <input 
-                    type="datetime-local" 
-                    value={newHotelCheckOut} 
+                  <input
+                    type="datetime-local"
+                    value={newHotelCheckOut}
                     onChange={(e) => setNewHotelCheckOut(e.target.value)}
                     className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg"
                   />
                 </div>
               </div>
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={!newHotelName.trim()}
-                className="w-full py-2 bg-indigo-650 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Create Hotel Voucher
               </button>
@@ -3142,7 +3255,7 @@ export default function ItineraryDisplay({
             <div className="space-y-4">
               {trip.hotels.map((hotel) => (
                 <div key={hotel.id} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col relative overflow-hidden">
-                  
+
                   {editingHotelId === hotel.id ? (
                     <div className="space-y-3.5 text-xs text-slate-800">
                       <div className="flex justify-between items-center border-b pb-2">
@@ -3152,9 +3265,9 @@ export default function ItineraryDisplay({
 
                       <div>
                         <label className="block text-[10px] text-slate-400 uppercase font-mono uppercase mb-0.5">Hotel Name</label>
-                        <input 
-                          type="text" 
-                          value={editHotelName} 
+                        <input
+                          type="text"
+                          value={editHotelName}
                           onChange={(e) => setEditHotelName(e.target.value)}
                           className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                         />
@@ -3162,9 +3275,9 @@ export default function ItineraryDisplay({
 
                       <div>
                         <label className="block text-[10px] text-slate-400 uppercase font-mono uppercase mb-0.5">Address</label>
-                        <input 
-                          type="text" 
-                          value={editHotelLocation} 
+                        <input
+                          type="text"
+                          value={editHotelLocation}
                           onChange={(e) => setEditHotelLocation(e.target.value)}
                           className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
                         />
@@ -3173,18 +3286,18 @@ export default function ItineraryDisplay({
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-slate-400 uppercase font-mono">Check-In</label>
-                          <input 
-                            type="datetime-local" 
-                            value={editHotelCheckIn} 
+                          <input
+                            type="datetime-local"
+                            value={editHotelCheckIn}
                             onChange={(e) => setEditHotelCheckIn(e.target.value)}
                             className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] text-slate-400 uppercase font-mono">Check-Out</label>
-                          <input 
-                            type="datetime-local" 
-                            value={editHotelCheckOut} 
+                          <input
+                            type="datetime-local"
+                            value={editHotelCheckOut}
                             onChange={(e) => setEditHotelCheckOut(e.target.value)}
                             className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
                           />
@@ -3192,13 +3305,13 @@ export default function ItineraryDisplay({
                       </div>
 
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => handleSaveHotelEdit(hotel.id)}
                           className="flex-grow py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition font-mono uppercase cursor-pointer"
                         >
                           Save stay
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRemoveHotel(hotel.id)}
                           className="p-2 border border-slate-250 bg-white hover:bg-rose-50 text-rose-500 rounded-xl transition cursor-pointer"
                         >
@@ -3211,7 +3324,7 @@ export default function ItineraryDisplay({
                       <div className="border-l-4 border-slate-900 pl-3">
                         <div className="flex items-center justify-between">
                           <h4 className="text-sm font-semibold text-slate-900">{hotel.name}</h4>
-                          <button 
+                          <button
                             onClick={() => handleStartEditHotel(hotel)}
                             className="p-1 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded text-xs transition"
                             title="Edit Stay"
@@ -3252,10 +3365,10 @@ export default function ItineraryDisplay({
         <div className="bg-white border border-slate-250 rounded-3xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-indigo-650" />
-              <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-widest">Places I Want to Go ({ (trip.wantToGoPlaces || []).length })</h4>
+              <Compass className="w-4 h-4 text-indigo-600" />
+              <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-widest">Places I Want to Go ({(trip.wantToGoPlaces || []).length})</h4>
             </div>
-            { (trip.wantToGoPlaces || []).length > 0 && (
+            {(trip.wantToGoPlaces || []).length > 0 && (
               <span className="text-[9px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-mono font-bold">Wishlist</span>
             )}
           </div>
@@ -3264,17 +3377,59 @@ export default function ItineraryDisplay({
             List down attractions. Click the suggested Day badge to instantly insert it, choose an options dropdown, or let AI recheck boundaries and suggest paths.
           </p>
 
-          <form onSubmit={handleAddWishlistPlace} className="flex gap-1.5">
-            <input 
-              type="text" 
-              placeholder="e.g. Meiji Jingu Shrine..."
-              value={newWishlistInput}
-              onChange={(e) => setNewWishlistInput(e.target.value)}
-              className="flex-grow px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
-            />
-            <button 
-              type="submit" 
-              className="px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shrink-0 cursor-pointer"
+          <form onSubmit={handleAddWishlistPlace} className="flex gap-1.5 w-full relative">
+            <div className="flex-grow relative">
+              <input
+                type="text"
+                placeholder="e.g. Meiji Jingu Shrine..."
+                value={newWishlistInput}
+                onFocus={() => fetchLocationSuggestions("", newWishlistInput, "wishlist")}
+                onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                onChange={(e) => {
+                  setNewWishlistInput(e.target.value);
+                  fetchLocationSuggestions("", e.target.value, "wishlist");
+                }}
+                className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl outline-none"
+              />
+              {showLocDropdown && activeLocField === "wishlist" && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                  {isSearchingLoc && (
+                    <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-slate-400 font-medium">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                      <span>Searching places...</span>
+                    </div>
+                  )}
+                  {!isSearchingLoc && locSuggestions.length === 0 && (
+                    <div className="px-3 py-2 text-[11px] text-slate-500 italic">
+                      No suggestions. Type to search...
+                    </div>
+                  )}
+                  {locSuggestions.map((s, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={() => {
+                        setNewWishlistInput(s.name + (s.address ? `, ${s.address}` : ""));
+                        setShowLocDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[11px] text-slate-700 font-semibold cursor-pointer flex flex-col gap-0.5 transition"
+                    >
+                      <span className="text-slate-900 font-bold flex items-center gap-1">
+                        📍 {s.name}
+                      </span>
+                      {s.address && (
+                        <span className="text-[9px] text-slate-400 pl-3.5 truncate">
+                          {s.address}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shrink-0 cursor-pointer h-[32px] self-start"
             >
               Add
             </button>
@@ -3295,24 +3450,24 @@ export default function ItineraryDisplay({
               {trip.wantToGoPlaces.map((place, i) => {
                 const scheduledDay = getScheduledDayOfPlace(place, trip.itinerary);
                 const rec = getAISuggestedDayForPlace(place, trip.itinerary);
-                
+
                 return (
                   <div key={i} className="flex flex-col p-3 bg-slate-50 border border-slate-150 rounded-2xl transition gap-2 group hover:border-slate-300">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="truncate flex-1">
                         <span className="text-xs font-semibold text-slate-800 block truncate" title={place}>{place}</span>
-                        
+
                         {scheduledDay !== null ? (
                           <span className="inline-flex mt-1 items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100 uppercase tracking-wide">
                             ✓ Added to Day {scheduledDay}
                           </span>
                         ) : (
-                          <span className="inline-block mt-0.5 text-[10px] text-indigo-650 font-medium">
+                          <span className="inline-block mt-0.5 text-[10px] text-indigo-600 font-medium">
                             ✨ AI Suggests: <strong className="font-bold underline text-indigo-700">Day {rec.suggestedDayIdx}</strong> ({rec.reason})
                           </span>
                         )}
                       </div>
-                      
+
                       <button
                         type="button"
                         onClick={() => handleRemoveWishlistPlace(place)}
@@ -3334,7 +3489,7 @@ export default function ItineraryDisplay({
                           >
                             Add Day {rec.suggestedDayIdx}
                           </button>
-                          
+
                           <select
                             onChange={(e) => {
                               const dVal = parseInt(e.target.value);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trip } from "../types";
+import travelData from "../../travelData.json";
 import { 
   DollarSign, AlertTriangle, Scale, Coins, Trash2, Plus, ArrowRight
 } from "lucide-react";
@@ -33,6 +34,28 @@ const USD_RATES: Record<string, number> = {
   GHS: 14.8
 };
 
+let dynamicRates: Record<string, number> | null = null;
+
+const fetchLiveRates = () => {
+  fetch("https://currency-rates.github.io/rates.json")
+    .then(res => {
+      if (res.ok) return res.json();
+      throw new Error("Rates API error");
+    })
+    .then(data => {
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        dynamicRates = data;
+      }
+    })
+    .catch(err => {
+      console.warn("Failed to fetch live currency rates, using fallback.", err);
+    });
+};
+
+try {
+  fetchLiveRates();
+} catch (_) {}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
   EUR: "€",
@@ -64,62 +87,35 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 
 const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "SGD", "AUD", "CAD", "MYR", "CNY", "KRW", "THB", "IDR", "INR", "PHP", "HKD", "TWD", "NZD", "CHF", "AED", "SAR", "ZAR", "NGN", "KES", "EGP", "MAD", "GHS"];
 
+interface TravelCountry {
+  country: string;
+  country_code: string | null;
+  currency_code: string | null;
+  states: string[];
+}
+
+const typedTravelData = travelData as TravelCountry[];
+
 const mapCountryToCurrency = (country: string): string => {
   const norm = (country || "").toLowerCase().trim();
   if (!norm) return "USD";
-  
-  const mapping: Record<string, string> = {
-    "united states": "USD", "us": "USD", "usa": "USD", "america": "USD",
-    "singapore": "SGD", "sg": "SGD", "sgp": "SGD",
-    "malaysia": "MYR", "my": "MYR", "mys": "MYR",
-    "japan": "JPY", "jp": "JPY", "jpn": "JPY", "tokyo": "JPY", "kyoto": "JPY", "osaka": "JPY",
-    "united kingdom": "GBP", "uk": "GBP", "gb": "GBP", "england": "GBP", "london": "GBP",
-    "australia": "AUD", "au": "AUD", "aus": "AUD", "sydney": "AUD", "melbourne": "AUD",
-    "canada": "CAD", "ca": "CAD", "can": "CAD", "toronto": "CAD", "vancouver": "CAD",
-    "china": "CNY", "cn": "CNY", "beijing": "CNY", "shanghai": "CNY",
-    "south korea": "KRW", "korea": "KRW", "kr": "KRW", "seoul": "KRW",
-    "thailand": "THB", "th": "THB", "bangkok": "THB", "phuket": "THB",
-    "indonesia": "IDR", "id": "IDR", "jakarta": "IDR", "bali": "IDR",
-    "india": "INR", "in": "INR", "delhi": "INR", "mumbai": "INR",
-    "philippines": "PHP", "philippine": "PHP", "philipines": "PHP", "philiplhine": "PHP", "phlippines": "PHP", "ph": "PHP", "manila": "PHP",
-    "hong kong": "HKD", "hk": "HKD", "hkg": "HKD",
-    "taiwan": "TWD", "tw": "TWD", "taipei": "TWD",
-    "new zealand": "NZD", "nz": "NZD", "auckland": "NZD",
-    "switzerland": "CHF", "ch": "CHF", "swiss": "CHF", "zurich": "CHF",
-    "united arab emirates": "AED", "uae": "AED", "dubai": "AED", "abu dhabi": "AED",
-    "saudi arabia": "SAR", "sa": "SAR", "riyadh": "SAR",
-    "south africa": "ZAR", "za": "ZAR", "johannesburg": "ZAR", "cape town": "ZAR",
-    "nigeria": "NGN", "ng": "NGN", "lagos": "NGN",
-    "egypt": "EGP", "eg": "EGP", "cairo": "EGP",
-    "kenya": "KES", "ke": "KES", "nairobi": "KES",
-    "morocco": "MAD", "ma": "MAD", "casablanca": "MAD", "marrakech": "MAD",
-    "ghana": "GHS", "gh": "GHS", "accra": "GHS",
-    "germany": "EUR", "france": "EUR", "italy": "EUR", "spain": "EUR", 
-    "netherlands": "EUR", "belgium": "EUR", "austria": "EUR", "greece": "EUR", 
-    "portugal": "EUR", "finland": "EUR", "ireland": "EUR", "paris": "EUR", "rome": "EUR"
-  };
 
-  if (mapping[norm]) return mapping[norm];
-
-  const words = norm.split(/[\s,./()|-]+/);
-  const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
-  for (const key of sortedKeys) {
-    if (key.includes(" ")) {
-      if (norm.includes(key)) return mapping[key];
-    } else if (words.includes(key)) {
-      return mapping[key];
-    }
+  const match = typedTravelData.find(c => c.country.toLowerCase() === norm);
+  if (match && match.currency_code) {
+    return match.currency_code;
   }
 
-  if (norm.includes("phil") || norm.includes("phli") || norm.includes("manila") || norm.includes("philipp")) {
-    return "PHP";
+  const partialMatch = typedTravelData.find(c => 
+    norm.includes(c.country.toLowerCase()) || 
+    c.country.toLowerCase().includes(norm)
+  );
+  if (partialMatch && partialMatch.currency_code) {
+    return partialMatch.currency_code;
   }
-  if (norm.includes("sing") || norm.includes("merlion")) {
-    return "SGD";
-  }
-  if (norm.includes("tokyo") || norm.includes("japan") || norm.includes("nrt") || norm.includes("hnd")) {
-    return "JPY";
-  }
+
+  if (norm.includes("us") || norm.includes("america") || norm.includes("united states")) return "USD";
+  if (norm.includes("uk") || norm.includes("london") || norm.includes("united kingdom")) return "GBP";
+  if (norm.includes("europe") || norm.includes("france") || norm.includes("germany") || norm.includes("italy")) return "EUR";
 
   return "USD";
 };
@@ -128,8 +124,9 @@ const convertAmount = (amount: number, from: string, to: string): number => {
   const cleanFrom = (from || "USD").toUpperCase();
   const cleanTo = (to || "USD").toUpperCase();
   if (cleanFrom === cleanTo) return amount;
-  const fromRate = USD_RATES[cleanFrom] || 1.0;
-  const toRate = USD_RATES[cleanTo] || 1.0;
+  const rates = dynamicRates || USD_RATES;
+  const fromRate = rates[cleanFrom] || 1.0;
+  const toRate = rates[cleanTo] || 1.0;
   return (amount / fromRate) * toRate;
 };
 
@@ -141,6 +138,12 @@ interface BudgetSummaryProps {
 export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps) {
   const baseCurrency = trip.budgetStats?.currency || "USD";
   const displayCurrency = trip.displayCurrency || baseCurrency;
+
+  useEffect(() => {
+    if (!dynamicRates) {
+      fetchLiveRates();
+    }
+  }, []);
 
   const homeCurr = mapCountryToCurrency(trip.homeCountry || "");
   const travelCurrs = Array.from(new Set([
@@ -221,9 +224,8 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
   const progressPercent = totalAspectBudgetInDisplay > 0 ? Math.min(Math.round((grandTotalSpendingInDisplay / totalAspectBudgetInDisplay) * 100), 100) : 0;
 
   const formatCurrency = (amount: number) => {
-    const symbol = CURRENCY_SYMBOLS[displayCurrency] || "$";
     const converted = convertAmount(amount, baseCurrency, displayCurrency);
-    return `${symbol}${Math.round(converted).toLocaleString()}`;
+    return `${Math.round(converted).toLocaleString()} ${displayCurrency}`;
   };
 
   const handleBudgetChange = (key: string, val: string) => {
@@ -330,14 +332,14 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
           >
             <optgroup label="🏡 Home Country Currency">
               <option value={homeCurr}>
-                {homeCurr} ({CURRENCY_SYMBOLS[homeCurr] || "$"}) - Home
+                {homeCurr} - Home
               </option>
             </optgroup>
             {travelCurrs.length > 0 && (
               <optgroup label="✈️ Travel Destination Currency">
                 {travelCurrs.map(curr => (
                   <option key={curr} value={curr}>
-                    {curr} ({CURRENCY_SYMBOLS[curr] || "$"}) - Destination
+                    {curr} - Destination
                   </option>
                 ))}
               </optgroup>
@@ -345,7 +347,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
             <optgroup label="🌐 All Other Currencies">
               {remainingCurrs.map(curr => (
                 <option key={curr} value={curr}>
-                  {curr} ({CURRENCY_SYMBOLS[curr] || "$"})
+                  {curr}
                 </option>
               ))}
             </optgroup>
@@ -449,7 +451,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
                 {/* Input Fields */}
                 <div className="grid grid-cols-2 gap-3 w-full lg:w-2/5 shrink-0">
                   <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase font-mono">My Budget ({symbol})</label>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase font-mono">My Budget ({displayCurrency})</label>
                     <input
                       type="number"
                       placeholder="e.g. 1000"
@@ -460,7 +462,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase font-mono">My Spending ({symbol})</label>
+                    <label className="block text-[9px] font-bold text-slate-400 uppercase font-mono">My Spending ({displayCurrency})</label>
                     <input
                       type="number"
                       placeholder="e.g. 850"
@@ -497,7 +499,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
         <div>
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Coins className="w-4 h-4 text-indigo-650" />
+            <Coins className="w-4 h-4 text-indigo-600" />
             Custom Miscellaneous Expense Log
           </h3>
           <p className="text-[11px] text-slate-400 mt-0.5">Perfect for small purchases like gifts, snacks or custom attraction passes not covered in the default categories</p>
@@ -535,7 +537,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase font-mono">Amount ({CURRENCY_SYMBOLS[displayCurrency] || "$"})</label>
+                <label className="text-[10px] font-semibold text-slate-500 uppercase font-mono">Amount ({displayCurrency})</label>
                 <input 
                   type="number" 
                   placeholder="e.g. 50"
@@ -550,7 +552,7 @@ export default function BudgetSummary({ trip, onUpdateTrip }: BudgetSummaryProps
 
             <button 
               type="submit" 
-              className="w-full py-2 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition duration-150 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition duration-150 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" /> Log Misc Expense
             </button>

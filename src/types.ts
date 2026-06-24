@@ -29,6 +29,7 @@ export interface Activity {
   time: string;
   description: string;
   location: string;
+  customTransitOrigin?: string;
   openingHours?: string;
   budgetRange?: string;
   ticketPrice?: string;

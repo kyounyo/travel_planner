@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import { Trip } from "../types";
-import { 
+import {
   CheckSquare, Square, Package, HelpCircle, Thermometer,
   CloudSun, ShoppingBag, Send, AlertCircle, Sparkles, Loader2,
-  ExternalLink, ChevronRight, FileText, Trash2, Plus
+  ExternalLink, ChevronRight, FileText, Trash2, Plus,
+  Calendar, Coins, Navigation, Utensils
 } from "lucide-react";
 
 interface CopilotPanelProps {
@@ -47,6 +48,9 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
   const [newToGo, setNewToGo] = useState("");
   const [newToPack, setNewToPack] = useState("");
   const [newToBuy, setNewToBuy] = useState("");
+
+  // Advisor selection
+  const [selectedAgent, setSelectedAgent] = useState<"general" | "planner" | "budget" | "transport" | "food">("general");
 
   // Weather state
   const [weatherData, setWeatherData] = useState<{
@@ -122,7 +126,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
   const handleAddItem = (type: "toGo" | "toPack" | "toBuy", text: string) => {
     if (!text.trim()) return;
     const cleanText = text.trim();
-    
+
     let nextToGo = checklistToGo;
     let nextToPack = checklistToPack;
     let nextToBuy = checklistToBuy;
@@ -203,6 +207,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMsg.text,
+          agentType: selectedAgent,
           tripContext: {
             destinationName: trip.destinationName,
             startDate: trip.startDate,
@@ -239,38 +244,130 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
     }
   };
 
+  const getHeaderColor = () => {
+    switch (selectedAgent) {
+      case "planner": return "bg-indigo-950 border-b border-indigo-900";
+      case "budget": return "bg-emerald-950 border-b border-emerald-900";
+      case "transport": return "bg-amber-950 border-b border-amber-900";
+      case "food": return "bg-rose-950 border-b border-rose-900";
+      default: return "bg-slate-900 border-b border-slate-800";
+    }
+  };
+
+  const getAgentTitle = () => {
+    switch (selectedAgent) {
+      case "planner": return "Planner Agent • Schedule Design";
+      case "budget": return "Budget Analyst • Price Checks";
+      case "transport": return "Transit Logistics • Subway & Walks";
+      case "food": return "Culinary Expert • Gastro Guide";
+      default: return "Multi-Agent Copilot Lead";
+    }
+  };
+
+  const getAgentSubtitle = () => {
+    switch (selectedAgent) {
+      case "planner": return "Structuring geographic layouts and timelines";
+      case "budget": return "Optimizing local currency budget stats";
+      case "transport": return "Checking routes and commute durations";
+      case "food": return "Sourcing authentic, highly-rated establishments";
+      default: return "Planner, Budget, Transit & Food Agents online";
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      
+
       {/* CO-PILOT CHAT ADVISORS (7 cols) */}
-      <div className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col h-[440px]">
-        
+      <div className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col h-[480px]">
+
         {/* Chat Header */}
-        <div className="bg-slate-900 text-white px-5 py-3 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center gap-2">
+        <div className={`text-white px-5 py-3.5 flex items-center justify-between transition-all duration-300 ${getHeaderColor()}`}>
+          <div className="flex items-center gap-2.5">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
             <div>
-              <h3 className="text-xs font-bold tracking-tight">Special Advisor Copilot</h3>
-              <p className="text-[9px] text-slate-400 font-mono">Planner, Budget, Transit & Food Agents</p>
+              <h3 className="text-xs font-bold tracking-tight">{getAgentTitle()}</h3>
+              <p className="text-[9px] text-slate-350 font-mono">{getAgentSubtitle()}</p>
             </div>
           </div>
           <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin-slow" />
         </div>
 
+        {/* Advisor Specialty Selector Bar */}
+        <div className="bg-slate-100 border-b border-slate-200/60 p-2 flex gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+          <button
+            type="button"
+            onClick={() => setSelectedAgent("general")}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1 shrink-0 cursor-pointer ${selectedAgent === "general"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white hover:bg-slate-200 text-slate-500 border border-slate-200/80"
+              }`}
+          >
+            <Sparkles className="w-2.5 h-2.5" />
+            Lead Agent
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAgent("planner")}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1 shrink-0 cursor-pointer ${selectedAgent === "planner"
+                ? "bg-indigo-600 text-white shadow-xs"
+                : "bg-white hover:bg-slate-200 text-slate-500 border border-slate-200/80"
+              }`}
+          >
+            <Calendar className="w-2.5 h-2.5" />
+            Planner
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAgent("budget")}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1 shrink-0 cursor-pointer ${selectedAgent === "budget"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-white hover:bg-slate-200 text-slate-500 border border-slate-200/80"
+              }`}
+          >
+            <Coins className="w-2.5 h-2.5" />
+            Budget Analyst
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAgent("transport")}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1 shrink-0 cursor-pointer ${selectedAgent === "transport"
+                ? "bg-amber-600 text-white shadow-xs animate-pulse-subtle"
+                : "bg-white hover:bg-slate-200 text-slate-500 border border-slate-200/80"
+              }`}
+          >
+            <Navigation className="w-2.5 h-2.5" />
+            Transit route
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedAgent("food")}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center gap-1 shrink-0 cursor-pointer ${selectedAgent === "food"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-white hover:bg-slate-200 text-slate-500 border border-slate-200/80"
+              }`}
+          >
+            <Utensils className="w-2.5 h-2.5" />
+            Gastro expert
+          </button>
+        </div>
+
         {/* Message Stream */}
         <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50/50">
           {messages.map((m) => (
-            <div 
-              key={m.id} 
+            <div
+              key={m.id}
               className={`flex flex-col max-w-[85%] ${m.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"}`}
             >
               <span className="text-[9px] text-slate-400 font-mono mb-1">{m.sender === "user" ? "You" : "Advisor Team"} • {m.timestamp}</span>
-              <div 
-                className={`p-3.5 rounded-2xl text-xs font-normal leading-relaxed shadow-xs ${
-                  m.sender === "user" 
-                    ? "bg-slate-950 text-white rounded-tr-none whitespace-pre-wrap" 
+              <div
+                className={`p-3.5 rounded-2xl text-xs font-normal leading-relaxed shadow-xs ${m.sender === "user"
+                    ? "bg-slate-950 text-white rounded-tr-none whitespace-pre-wrap"
                     : "bg-white text-slate-800 border border-slate-200/60 rounded-tl-none"
-                }`}
+                  }`}
               >
                 {m.sender === "user" ? (
                   m.text
@@ -306,7 +403,13 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
         <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-100 flex gap-2 bg-white">
           <input
             type="text"
-            placeholder="Ask transport, custom food places, budget comparisons..."
+            placeholder={
+              selectedAgent === "budget" ? "Ask about conversions, souvenir budgets, dining price ranges..." :
+                selectedAgent === "transport" ? "Ask about subway rides, walkability, JR routes..." :
+                  selectedAgent === "food" ? "Ask about ramen joints, street markets, local delicacies..." :
+                    selectedAgent === "planner" ? "Ask about optimizing daily flow, checklists, packing guidelines..." :
+                      "Ask transit, local delicacies, budget comparisons or coordinate fine-tunings..."
+            }
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             disabled={isChatLoading}
@@ -324,11 +427,11 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
 
       {/* TRIP CHECKLISTS, WEATHER & USEFUL BOOKING LINKS (5 cols) */}
       <div className="lg:col-span-5 space-y-6">
-        
+
         {/* Dynamic Weather Card */}
         <div className="bg-gradient-to-br from-indigo-900 to-slate-950 text-white p-5 rounded-3xl shadow-md space-y-3 relative overflow-hidden">
           <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full opacity-30 blur-2xl"></div>
-          
+
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400">Seasonal Weather Prognosis</span>
@@ -364,7 +467,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
         {/* brings up a list of to go, to pack, to buy */}
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <CheckSquare className="w-4 h-4 text-indigo-650" />
+            <CheckSquare className="w-4 h-4 text-indigo-600" />
             Trip Checklist Hub
           </h3>
 
@@ -372,11 +475,11 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
             {/* Checklist: To Go */}
             <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">1. Tasks To Go (Pre-travel)</span>
-              
+
               {/* Add form */}
               <form onSubmit={(e) => { e.preventDefault(); handleAddItem("toGo", newToGo); }} className="flex gap-1.5">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newToGo}
                   onChange={(e) => setNewToGo(e.target.value)}
                   placeholder="Add pre-travel task..."
@@ -406,7 +509,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
                           )}
                           <span className={isDone ? "line-through text-slate-400 font-normal" : "text-slate-700"}>{item}</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRemoveItem("toGo", item)}
                           className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
                           title="Delete checklist item"
@@ -423,11 +526,11 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
             {/* Checklist: To Pack */}
             <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">2. Items To Pack</span>
-              
+
               {/* Add form */}
               <form onSubmit={(e) => { e.preventDefault(); handleAddItem("toPack", newToPack); }} className="flex gap-1.5">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newToPack}
                   onChange={(e) => setNewToPack(e.target.value)}
                   placeholder="Add item to pack..."
@@ -457,7 +560,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
                           )}
                           <span className={isDone ? "line-through text-slate-400 font-normal" : "text-slate-700"}>{item}</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRemoveItem("toPack", item)}
                           className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
                           title="Delete checklist item"
@@ -474,11 +577,11 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
             {/* Checklist: To Buy */}
             <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">3. Things To Buy</span>
-              
+
               {/* Add form */}
               <form onSubmit={(e) => { e.preventDefault(); handleAddItem("toBuy", newToBuy); }} className="flex gap-1.5">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newToBuy}
                   onChange={(e) => setNewToBuy(e.target.value)}
                   placeholder="Add item to buy..."
@@ -508,7 +611,7 @@ export default function CopilotPanel({ trip, onUpdateTrip }: CopilotPanelProps) 
                           )}
                           <span className={isDone ? "line-through text-slate-440 font-normal" : "text-slate-700"}>{item}</span>
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleRemoveItem("toBuy", item)}
                           className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-rose-500 md:opacity-0 md:group-hover:opacity-100 transition duration-150 cursor-pointer shrink-0"
                           title="Delete checklist item"

@@ -5,85 +5,13 @@ import ItineraryDisplay from "./components/ItineraryDisplay";
 import BudgetSummary from "./components/BudgetSummary";
 import CopilotPanel from "./components/CopilotPanel";
 import { UserProfile, Trip, ActivityRating } from "./types";
-import { 
-  Compass, LogOut, Plane, Sparkles, FolderOpen, LogIn, Heart, 
+import {
+  Compass, LogOut, Plane, Sparkles, FolderOpen, LogIn, Heart,
   MapPin, PlusCircle, ArrowLeft, Loader2, Calendar, DollarSign, Package, Trash2
 } from "lucide-react";
 
 const enforceFlightBoundariesClient = (itinerary: any[], flights: any[]): any[] => {
-  if (!itinerary || !Array.isArray(itinerary) || itinerary.length === 0) {
-    return itinerary;
-  }
-  if (!flights || !Array.isArray(flights) || flights.length === 0) {
-    return itinerary;
-  }
-
-  const departFlight = flights.find(f => f.type === "depart");
-  const returnFlight = flights.find(f => f.type === "return");
-
-  const parseTimeToMinutes = (timeStr: string): number => {
-    if (!timeStr) return 0;
-    const firstPart = timeStr.split("-")[0].trim().toLowerCase();
-    const match = firstPart.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
-    if (!match) {
-      const simpleMatch = firstPart.match(/(\d{1,2})/);
-      if (simpleMatch) {
-         return parseInt(simpleMatch[1], 10) * 60;
-      }
-      return 0;
-    }
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const ampm = match[3]?.toLowerCase();
-    if (ampm === "pm" && hours < 12) hours += 12;
-    if (ampm === "am" && hours === 12) hours = 0;
-    return hours * 60 + minutes;
-  };
-
-  const sortedItinerary = [...itinerary].sort((a, b) => a.dayIndex - b.dayIndex);
-
-  sortedItinerary.forEach((day: any) => {
-    const dayDateStr = day.date;
-    if (!dayDateStr) return;
-
-    // 1. Depart Flight Arrival check on matching date
-    if (departFlight && departFlight.arrivalTime) {
-      const flightArrivalDate = departFlight.arrivalTime.substring(0, 10);
-      if (dayDateStr === flightArrivalDate) {
-        const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
-          ? departFlight.arrivalTime.split("T")[1] 
-          : departFlight.arrivalTime;
-        const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
-        if (arrivalMin > 0) {
-          day.activities = day.activities.filter((act: any) => {
-            if (act.type === "airport" || act.type === "checkin" || act.title?.toLowerCase().includes("check-in") || act.title?.toLowerCase().includes("airport")) return true;
-            const actMin = parseTimeToMinutes(act.time);
-            return actMin >= arrivalMin;
-          });
-        }
-      }
-    }
-
-    // 2. Return Flight Departure check on matching date
-    if (returnFlight && returnFlight.departureTime) {
-      const flightReturnDate = returnFlight.departureTime.substring(0, 10);
-      if (dayDateStr === flightReturnDate) {
-        const departureTimeStr = returnFlight.departureTime.includes("T") 
-          ? returnFlight.departureTime.split("T")[1] 
-          : returnFlight.departureTime;
-        const departMin = parseTimeToMinutes(departureTimeStr);
-        if (departMin > 0) {
-          day.activities = day.activities.filter((act: any) => {
-            if (act.type === "airport" || act.title?.toLowerCase().includes("airport")) return true;
-            const actMin = parseTimeToMinutes(act.time);
-            return actMin <= departMin;
-          });
-        }
-      }
-    }
-  });
-
-  return sortedItinerary;
+  return itinerary;
 };
 
 export default function App() {
@@ -99,7 +27,7 @@ export default function App() {
 
   // Bookmark states
   const [favoritedActivities, setFavoritedActivities] = useState<string[]>([]);
-  
+
   // Rating states (Feedback Loop)
   const [activityRatings, setActivityRatings] = useState<ActivityRating[]>([]);
 
@@ -140,7 +68,7 @@ export default function App() {
     if (cachedFavs) {
       try {
         setFavoritedActivities(JSON.parse(cachedFavs));
-      } catch {}
+      } catch { }
     }
 
     // Load ratings
@@ -148,7 +76,7 @@ export default function App() {
     if (cachedRatings) {
       try {
         setActivityRatings(JSON.parse(cachedRatings));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -176,13 +104,15 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           destinations: draftTrip.destinations,
+          destinationStays: draftTrip.destinationStays,
           startDate: draftTrip.startDate,
           endDate: draftTrip.endDate,
           flights: draftTrip.flights,
           hotels: draftTrip.hotels,
           preferences: draftTrip.preferences,
           wantToGoPlaces: draftTrip.wantToGoPlaces,
-          feedbackRatings: activityRatings // Pass rated items to model for custom personalization!
+          feedbackRatings: activityRatings, // Pass rated items to model for custom personalization!
+          homeCountry: draftTrip.homeCountry
         }),
       });
 
@@ -199,7 +129,7 @@ export default function App() {
             } else if (rawBody && rawBody.length < 200) {
               errMsg = rawBody;
             }
-          } catch {}
+          } catch { }
         }
         throw new Error(errMsg);
       }
@@ -256,6 +186,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           destinations: currentTrip.destinations,
+          destinationStays: currentTrip.destinationStays,
           startDate: currentTrip.startDate,
           endDate: currentTrip.endDate,
           flights: currentTrip.flights,
@@ -264,7 +195,8 @@ export default function App() {
           wantToGoPlaces: currentTrip.wantToGoPlaces,
           customEdits: accumulatedEdits,
           feedbackRatings: activityRatings,
-          itinerary: currentTrip.itinerary
+          itinerary: currentTrip.itinerary,
+          homeCountry: currentTrip.homeCountry
         }),
       });
 
@@ -281,7 +213,7 @@ export default function App() {
             } else if (rawBody && rawBody.length < 200) {
               errMsg = rawBody;
             }
-          } catch {}
+          } catch { }
         }
         throw new Error(errMsg);
       }
@@ -346,9 +278,9 @@ export default function App() {
   // Directly update trip properties, itinerary, checklists and budget status
   const handleUpdateTrip = (updatedTrip: Trip) => {
     if (!currentUser) return;
-    
+
     let finalTrip = { ...updatedTrip };
-    
+
     const originalTrip = trips.find(t => t.id === finalTrip.id);
     if (originalTrip) {
       const changedItinerary = JSON.stringify(originalTrip.itinerary) !== JSON.stringify(finalTrip.itinerary);
@@ -374,7 +306,7 @@ export default function App() {
   // Delete a trip and clear its state/history
   const handleDeleteTrip = (tripId: string) => {
     if (!currentUser) return;
-    
+
     const updatedTrips = trips.filter(t => t.id !== tripId);
     setTrips(updatedTrips);
     localStorage.setItem(`saved_trips_${currentUser.id}`, JSON.stringify(updatedTrips));
@@ -399,13 +331,13 @@ export default function App() {
       day.activities.forEach((act, aIdx) => {
         // Compose dates safely or use current
         const eventDateStr = day.date.replace(/-/g, ""); // "20260620"
-        
+
         // Simple mock hourly block to make google calendar look amazing
         const startHour = 9 + (aIdx * 3);
         const endHour = startHour + 2;
-        
+
         const pad = (num: number) => num.toString().padStart(2, "0");
-        
+
         const timestampStart = `${eventDateStr}T${pad(startHour)}0000Z`;
         const timestampEnd = `${eventDateStr}T${pad(endHour)}0000Z`;
 
@@ -451,7 +383,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased text-slate-900">
-      
+
       {/* GLOBAL NAVBAR */}
       <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-2.5">
@@ -482,7 +414,7 @@ export default function App() {
 
       {/* CORE FRAMEWORK WORKSPACE */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
-        
+
         {/* Error notification banner */}
         {generationError && (
           <div className="p-4 bg-rose-50 border border-rose-100 text-rose-700 rounded-2xl text-xs font-medium flex items-center gap-2">
@@ -498,17 +430,17 @@ export default function App() {
               <div className="w-20 h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
               <Sparkles className="w-8 h-8 text-indigo-500 absolute inset-0 m-auto animate-pulse" />
             </div>
-            
+
             <div className="space-y-2 max-w-sm">
               <h2 className="text-base font-semibold text-slate-900">Assembling Your Bespoke Itinerary...</h2>
               <p className="text-xs text-slate-400 font-medium leading-relaxed">Our planner, transport, and local food experts are coordinating coordinates, validating travel durations, and verifying attraction details with the Google Maps Platform.</p>
             </div>
           </div>
         ) : !selectedTripId ? (
-          
+
           /* TRIP LIST VIEW & CREATION TRIGGER */
           <div className="space-y-8">
-            
+
             {/* Quick Stats Panel */}
             {trips.length > 0 && !isCreatingNewTrip && (
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
@@ -538,17 +470,17 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                <TripCreator 
-                  currentUserId={currentUser.id} 
-                  onTripCreated={handleCreateTrip} 
-                  isLoading={isGenerating} 
+                <TripCreator
+                  currentUserId={currentUser.id}
+                  onTripCreated={handleCreateTrip}
+                  isLoading={isGenerating}
                 />
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {trips.map((trip) => (
-                  <div 
-                    key={trip.id} 
+                  <div
+                    key={trip.id}
                     onClick={() => {
                       if (tripIdToConfirmDelete === trip.id) return;
                       setSelectedTripId(trip.id);
@@ -556,7 +488,7 @@ export default function App() {
                     className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-xs hover:shadow-md hover:border-slate-300 transition-all cursor-pointer relative overflow-hidden group flex flex-col justify-between h-48"
                   >
                     {tripIdToConfirmDelete === trip.id && (
-                      <div 
+                      <div
                         className="absolute inset-0 bg-slate-950/95 backdrop-blur-xs flex flex-col justify-between p-6 text-white z-20"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -618,10 +550,10 @@ export default function App() {
             )}
           </div>
         ) : (
-          
+
           /* ACTIVE TRIP INTERACTIVE COCKPIT */
           <div className="space-y-6">
-            
+
             {/* Header / Trip Navigation Hub */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -656,31 +588,28 @@ export default function App() {
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/55 p-1 rounded-2xl self-start md:self-auto shrink-0">
                 <button
                   onClick={() => setActiveTab("itinerary")}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${
-                    activeTab === "itinerary"
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "itinerary"
                       ? "bg-white text-slate-950 shadow-xs border border-slate-200/50"
                       : "text-slate-500 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   Itinerary
                 </button>
                 <button
                   onClick={() => setActiveTab("budget")}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${
-                    activeTab === "budget"
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "budget"
                       ? "bg-white text-slate-950 shadow-xs border border-slate-200/50"
                       : "text-slate-500 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   Budget auditing
                 </button>
                 <button
                   onClick={() => setActiveTab("copilot")}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${
-                    activeTab === "copilot"
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition ${activeTab === "copilot"
                       ? "bg-white text-slate-950 shadow-xs border border-slate-200/50"
                       : "text-slate-500 hover:text-slate-900"
-                  }`}
+                    }`}
                 >
                   Checklists & Chat
                 </button>
@@ -690,8 +619,8 @@ export default function App() {
             {/* DYNAMIC Tab rendering workspace */}
             <div className="transition-all duration-300">
               {activeTab === "itinerary" && activeTrip && (
-                <ItineraryDisplay 
-                  trip={activeTrip} 
+                <ItineraryDisplay
+                  trip={activeTrip}
                   favoritedActivities={favoritedActivities}
                   onToggleFavorite={handleToggleFavorite}
                   onRateActivity={handleRateActivity}
@@ -705,15 +634,15 @@ export default function App() {
               )}
 
               {activeTab === "budget" && activeTrip && (
-                <BudgetSummary 
-                  trip={activeTrip} 
+                <BudgetSummary
+                  trip={activeTrip}
                   onUpdateTrip={handleUpdateTrip}
                 />
               )}
 
               {activeTab === "copilot" && activeTrip && (
-                <CopilotPanel 
-                  trip={activeTrip} 
+                <CopilotPanel
+                  trip={activeTrip}
                   onUpdateTrip={handleUpdateTrip}
                 />
               )}

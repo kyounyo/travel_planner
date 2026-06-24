@@ -6,6 +6,23 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 dotenv.config();
 
+import fs from "fs";
+
+const travelData = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "travelData.json"), "utf8")
+);
+
+const detectCurrencyForLocation = (location: string): string => {
+  if (!location) return "USD";
+  const norm = location.toLowerCase();
+  for (const c of travelData) {
+    if (norm.includes(c.country.toLowerCase())) {
+      return c.currency_code || "USD";
+    }
+  }
+  return "USD";
+};
+
 const app = express();
 const PORT = 3000;
 
@@ -15,13 +32,13 @@ app.use(express.json());
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = apiKey
   ? new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
       },
-    })
+    },
+  })
   : null;
 
 // Helper to perform robust retries with exponential backoff for transient Gemini failures
@@ -75,7 +92,7 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
     if (!match) {
       const simpleMatch = firstPart.match(/(\d{1,2})/);
       if (simpleMatch) {
-         return parseInt(simpleMatch[1], 10) * 60;
+        return parseInt(simpleMatch[1], 10) * 60;
       }
       return 0;
     }
@@ -97,8 +114,8 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
     if (departFlight && departFlight.arrivalTime) {
       const flightArrivalDate = departFlight.arrivalTime.substring(0, 10); // "2026-06-18"
       if (dayDateStrString === flightArrivalDate) {
-        const arrivalTimeStr = departFlight.arrivalTime.includes("T") 
-          ? departFlight.arrivalTime.split("T")[1] 
+        const arrivalTimeStr = departFlight.arrivalTime.includes("T")
+          ? departFlight.arrivalTime.split("T")[1]
           : departFlight.arrivalTime;
         const arrivalMin = parseTimeToMinutes(arrivalTimeStr);
         if (arrivalMin > 0) {
@@ -115,8 +132,8 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
     if (returnFlight && returnFlight.departureTime) {
       const flightReturnDate = returnFlight.departureTime.substring(0, 10); // "2026-06-25"
       if (dayDateStrString === flightReturnDate) {
-        const departureTimeStr = returnFlight.departureTime.includes("T") 
-          ? returnFlight.departureTime.split("T")[1] 
+        const departureTimeStr = returnFlight.departureTime.includes("T")
+          ? returnFlight.departureTime.split("T")[1]
           : returnFlight.departureTime;
         const departMin = parseTimeToMinutes(departureTimeStr);
         if (departMin > 0) {
@@ -136,11 +153,11 @@ function enforceFlightBoundaries(itinerary: any[], flights: any[]): any[] {
 async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any[] = []): Promise<any[]> {
   const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY;
   const hasMapsKey = apiKey && apiKey !== "YOUR_API_KEY";
-  
+
   if (!itinerary || !Array.isArray(itinerary) || itinerary.length === 0) {
     return itinerary;
   }
-  
+
   // Clean time formatting helper (HH:MM AM/PM)
   const formatMinutesToTime = (minutes: number): string => {
     let hrs = Math.floor(minutes / 60) % 24;
@@ -163,7 +180,7 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
         if (ampm === "am" && hours === 12) hours = 0;
         return hours * 60 + minutes;
       }
-    } catch (_) {}
+    } catch (_) { }
     return 0;
   };
 
@@ -179,15 +196,15 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
 
   for (const day of itinerary) {
     if (!day.activities || !Array.isArray(day.activities) || day.activities.length === 0) continue;
-    
+
     // Enrich with helper values
     day.activities = day.activities.map((act) => {
       const times = parseActivityTimes(act.time);
-      return { 
-        ...act, 
-        _startMin: times.start, 
-        _endMin: times.end, 
-        _origDuration: Math.max(30, times.end - times.start) 
+      return {
+        ...act,
+        _startMin: times.start,
+        _endMin: times.end,
+        _origDuration: Math.max(30, times.end - times.start)
       };
     });
 
@@ -197,9 +214,11 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
     for (let i = 0; i < day.activities.length - 1; i++) {
       const actA = day.activities[i];
       const actB = day.activities[i + 1];
-      
-      if (!actA.location || !actB.location) continue;
-      if (actA.location.trim().toLowerCase() === actB.location.trim().toLowerCase()) continue;
+
+      if (!actB.location) continue;
+      const originLoc = actB.customTransitOrigin || actA.location;
+      if (!originLoc) continue;
+      if (originLoc.trim().toLowerCase() === actB.location.trim().toLowerCase()) continue;
 
       // Do not auto-assign preferredTransportMode on initial generation so that the user gets to select of their own desire.
 
@@ -208,7 +227,7 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
       const preferredMode = actB.preferredTransportMode || "transit";
 
       const modeLower = (actB.transportation?.mode || "").toLowerCase();
-      const matchesPreferred = 
+      const matchesPreferred =
         (preferredMode === "walking" && (modeLower.includes("walk") || modeLower.includes("foot"))) ||
         (preferredMode === "driving" && (modeLower.includes("driving") || modeLower.includes("taxi") || modeLower.includes("car") || modeLower.includes("uber") || modeLower.includes("grab"))) ||
         (preferredMode === "transit" && (modeLower.includes("transit") || modeLower.includes("train") || modeLower.includes("metro") || modeLower.includes("subway") || modeLower.includes("bus")));
@@ -225,15 +244,23 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
         }
       } else {
         // Set dynamic fallback commute
+        const locCurrency = detectCurrencyForLocation(actB.location || originLoc || "");
         if (preferredMode === "driving") {
           travelDurationMinutes = 18;
           distanceText = "4.2 km";
+          const formattedCost = locCurrency === "JPY"
+            ? "1800 - 2900 JPY"
+            : locCurrency === "USD"
+              ? "15 - 25 USD"
+              : locCurrency === "EUR"
+                ? "12 - 20 EUR"
+                : `15 - 25 ${locCurrency}`;
           actB.transportation = {
             mode: "Taxi / Car",
             duration: "18 mins",
             distance: "4.2 km",
-            cost: "¥1,800 - ¥2,900",
-            details: `Commute from "${actA.title}" to "${actB.title}" via taxi/car`
+            cost: formattedCost,
+            details: `Commute from "${actB.customTransitOrigin ? originLoc : actA.title}" to "${actB.title}" via taxi/car`
           };
         } else if (preferredMode === "walking") {
           travelDurationMinutes = 12;
@@ -243,38 +270,50 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
             duration: "12 mins",
             distance: "0.8 km",
             cost: "Free",
-            details: `Walk from "${actA.title}" to "${actB.title}"`
+            details: `Walk from "${actB.customTransitOrigin ? originLoc : actA.title}" to "${actB.title}"`
           };
         } else {
           travelDurationMinutes = 25;
           distanceText = "3.5 km";
+          const formattedCost = locCurrency === "JPY"
+            ? "220 JPY"
+            : locCurrency === "USD"
+              ? "2.75 USD"
+              : locCurrency === "EUR"
+                ? "2.10 EUR"
+                : `3 ${locCurrency}`;
           actB.transportation = {
             mode: "Public Transit",
             duration: "25 mins",
             distance: "3.5 km",
-            cost: "¥220",
-            details: `Subway/bus commute from "${actA.title}" to "${actB.title}"`
+            cost: formattedCost,
+            details: `Subway/bus commute from "${actB.customTransitOrigin ? originLoc : actA.title}" to "${actB.title}"`
           };
         }
       }
 
       if (hasMapsKey) {
         try {
-          const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(actA.location)}&destinations=${encodeURIComponent(actB.location)}&mode=${preferredMode}&key=${apiKey}`;
+          const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(originLoc)}&destinations=${encodeURIComponent(actB.location)}&mode=${preferredMode}&key=${apiKey}`;
           const response = await fetch(url);
           const data = await response.json();
           if (data && data.rows && data.rows[0]?.elements?.[0]?.status === "OK") {
             const el = data.rows[0].elements[0];
             travelDurationMinutes = Math.round(el.duration.value / 60);
             distanceText = el.distance.text;
-            
+
+            const locCurrency = detectCurrencyForLocation(actB.location || originLoc || "");
+            const formattedCost = preferredMode === "driving"
+              ? (locCurrency === "JPY" ? "1500 - 3500 JPY" : locCurrency === "USD" ? "12 - 30 USD" : locCurrency === "EUR" ? "10 - 25 EUR" : `15 ${locCurrency}`)
+              : (locCurrency === "JPY" ? "220 - 400 JPY" : locCurrency === "USD" ? "2.75 - 5 USD" : locCurrency === "EUR" ? "2 - 4 EUR" : `3 ${locCurrency}`);
+
             // Populate exactly calculated commute
             actB.transportation = {
               mode: preferredMode === "driving" ? "Taxi / Car" : preferredMode === "walking" ? "Walking" : "Public Transit",
               duration: `${travelDurationMinutes} mins`,
               distance: distanceText,
-              cost: preferredMode === "driving" ? "¥1,500 - ¥3,500" : preferredMode === "walking" ? "Free" : "¥220 - ¥400",
-              details: `Commute from "${actA.title}" to "${actB.title}" via ${preferredMode}`
+              cost: preferredMode === "walking" ? "Free" : formattedCost,
+              details: `Commute from "${actB.customTransitOrigin ? originLoc : actA.title}" to "${actB.title}" via ${preferredMode}`
             };
           }
         } catch (err) {
@@ -285,7 +324,7 @@ async function adjustItineraryForRealWorldTransit(itinerary: any[], flights: any
       // Resolve warnings where available gap violates the physical speed limits/transit durations
       const currentGap = actB._startMin - actA._endMin;
       const requiredGap = travelDurationMinutes;
-      
+
       if (currentGap < requiredGap) {
         const originalStart = actB._startMin;
         const newStart = actA._endMin + requiredGap + 10; // Add 10 mins padding buffer
@@ -338,56 +377,69 @@ app.post("/api/plan-trip", async (req, res) => {
     }
 
     // Construct detailed prompt showcasing the multi-agent flow
-    const flightText = flights && flights.length > 0 
-      ? flights.map((f: any, i: number) => 
-          `Flight ${i+1}: ${f.type === 'depart' ? 'Departure (Outbound)' : 'Return'} flight ${f.flightNo || 'N/A'} from ${f.departureAirport || 'N/A'} to ${f.arrivalAirport || 'N/A'}. Depart time: ${f.departureTime || 'N/A'}, Arrive time: ${f.arrivalTime || 'N/A'}`
-        ).join("\n")
+    const flightText = flights && flights.length > 0
+      ? flights.map((f: any, i: number) =>
+        `Flight ${i + 1}: ${f.type === 'depart' ? 'Departure (Outbound)' : 'Return'} flight ${f.flightNo || 'N/A'} from ${f.departureAirport || 'N/A'} to ${f.arrivalAirport || 'N/A'}. Depart time: ${f.departureTime || 'N/A'}, Arrive time: ${f.arrivalTime || 'N/A'}`
+      ).join("\n")
       : "No flights booked yet.";
 
     const hotelText = hotels && hotels.length > 0
-      ? hotels.map((h: any, i: number) => 
-          `Hotel ${i+1}: ${h.name || 'N/A'} (Check-in: ${h.checkIn || 'N/A'}, Check-out: ${h.checkOut || 'N/A'}, Address/Location: ${h.locationUrl || h.name || 'N/A'})`
-        ).join("\n")
+      ? hotels.map((h: any, i: number) =>
+        `Hotel ${i + 1}: ${h.name || 'N/A'} (Check-in: ${h.checkIn || 'N/A'}, Check-out: ${h.checkOut || 'N/A'}, Address/Location: ${h.locationUrl || h.name || 'N/A'})`
+      ).join("\n")
       : "No hotels booked yet.";
 
     const wantToGoText = wantToGoPlaces && wantToGoPlaces.length > 0
-      ? `CRITICAL "Want to Go" Places List from the User:\n` + 
-        `The user has explicitly specified a checklist of attractions they want to visit. You MUST include and schedule AS MANY of these places into the Day-to-Day activities flow as possible across the itinerary:\n` +
-        wantToGoPlaces.map((place: string) => `- "${place}"`).join("\n")
+      ? `CRITICAL "Want to Go" Places List from the User:\n` +
+      `The user has explicitly specified a checklist of attractions they want to visit. You MUST include and schedule AS MANY of these places into the Day-to-Day activities flow as possible across the itinerary:\n` +
+      wantToGoPlaces.map((place: string) => `- "${place}"`).join("\n")
       : "";
 
     const feedbackText = feedbackRatings && feedbackRatings.length > 0
-      ? `Ensure you respect user's feedback/ratings on past activities:\n` + 
-        feedbackRatings.map((rating: any) => `- User rated "${rating.title}" as ${rating.rating}/5 stars. Notes: ${rating.comment || 'None'}`).join("\n")
+      ? `Ensure you respect user's feedback/ratings on past activities:\n` +
+      feedbackRatings.map((rating: any) => `- User rated "${rating.title}" as ${rating.rating}/5 stars. Notes: ${rating.comment || 'None'}`).join("\n")
       : "";
 
-    const userInstructionsText = customEdits 
+    const userInstructionsText = customEdits
       ? `CRITICAL Directives/Custom Requests from User (You MUST follow and fulfill ALL of these sequential/layered instructions simultaneously, keeping previous edits in place. Do NOT discard any of these requirements):\n${customEdits}\nUpdate the itinerary to reflect ALL of the above requests combined.`
       : "";
 
     const existingItineraryText = itinerary && itinerary.length > 0
       ? `\n### EXTREMELY CRITICAL: CURRENT ACTIVE ITINERARY TO REFINE\n` +
-        `This is the current active day-to-day schedule that the traveler is viewing. You are performing a REFINE/ADD/REMOVE/EDIT operation on it.\n` +
-        `STRICT SCHEDULE LAYOUT PRESERVATION MANDATES:\n` +
-        `- DO NOT change, delete, swap, or rearrange any unaffected activities. They must remain in the same sequence on the same days, with their existing dates, titles, descriptions, opening hours, cost fields, and IDs preserved EXACTLY.\n` +
-        `- ONLY perform targeted additions (e.g. inserting an activity slot), removals, or details editing as requested by the user's latest directives.\n` +
-        `- Keep themes and everything else unchanged unless explicitly asked otherwise.\n` +
-        `- If you add a slot, place it chronologically in the active day's activities list and ensure neighboring transitions are updated, but keep non-neighboring transitions and all other days exactly identical.\n\n` +
-        `Current Itinerary State:\n${JSON.stringify(itinerary, null, 2)}\n`
+      `This is the current active day-to-day schedule that the traveler is viewing. You are performing a REFINE/ADD/REMOVE/EDIT operation on it.\n` +
+      `STRICT SCHEDULE LAYOUT PRESERVATION MANDATES:\n` +
+      `- DO NOT change, delete, swap, or rearrange any unaffected activities. They must remain in the same sequence on the same days, with their existing dates, titles, descriptions, opening hours, cost fields, and IDs preserved EXACTLY.\n` +
+      `- ONLY perform targeted additions (e.g. inserting an activity slot), removals, or details editing as requested by the user's latest directives.\n` +
+      `- Keep themes and everything else unchanged unless explicitly asked otherwise.\n` +
+      `- If you add a slot, place it chronologically in the active day's activities list and ensure neighboring transitions are updated, but keep non-neighboring transitions and all other days exactly identical.\n\n` +
+      `Current Itinerary State:\n${JSON.stringify(itinerary, null, 2)}\n`
       : "";
 
     // Pre-calculate exact list of dates and count to ensure Gemini does not truncate or miscalculate dates
-    const start = new Date(startDate + "T00:00:00");
-    const end = new Date(endDate + "T00:00:00");
     const daysList: string[] = [];
-    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-      let current = new Date(start);
-      let safetyCounter = 0;
-      while (current <= end && safetyCounter < 100) {
-        daysList.push(current.toISOString().split("T")[0]);
-        current.setDate(current.getDate() + 1);
-        safetyCounter++;
+    try {
+      const startParts = (startDate || "").split("-").map(Number);
+      const endParts = (endDate || "").split("-").map(Number);
+      if (startParts.length === 3 && endParts.length === 3) {
+        const startUTC = Date.UTC(startParts[0], startParts[1] - 1, startParts[2]);
+        const endUTC = Date.UTC(endParts[0], endParts[1] - 1, endParts[2]);
+        if (!isNaN(startUTC) && !isNaN(endUTC)) {
+          let currentUTC = startUTC;
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          let safetyCounter = 0;
+          while (currentUTC <= endUTC && safetyCounter < 100) {
+            const curDate = new Date(currentUTC);
+            const year = curDate.getUTCFullYear();
+            const month = String(curDate.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(curDate.getUTCDate()).padStart(2, "0");
+            daysList.push(`${year}-${month}-${day}`);
+            currentUTC += oneDayMs;
+            safetyCounter++;
+          }
+        }
       }
+    } catch (e) {
+      console.error("Error computing daysList with UTC:", e);
     }
     const exactDaysCount = daysList.length > 0 ? daysList.length : 1;
     const exactDatesText = daysList.map((d, i) => `Day ${i + 1}: ${d}`).join("\n");
@@ -438,15 +490,17 @@ ${existingItineraryText}
       3. "Commute & Travel to New Destination Base"
       4. "Hotel Check-in: [Hotel Name B]"
   - MANDATORY FLIGHT ARRIVAL & AIRPORT RETURN TRANSITION SLOTS:
-    - For every depart or outbound flight in the trip:
-      - You MUST explicitly schedule a "Flight Landing & Arrival at [Airport name/code]" activity slot in the Day-by-Day schedule, at the exact arrival time of that flight.
-      - You MUST explicitly schedule a "Commute & Return to [Airport name/code] for Departure" activity slot in the Day-by-Day schedule, starting exactly 2-3 hours before the flight departure time.
+    - For EVERY flight (both outbound/depart and return flights):
+      - You MUST explicitly schedule a "Flight Boarding & Departure [Flight No]" activity slot in the Day-by-Day schedule starting EXACTLY at the flight's scheduled departure time (or up to 30 minutes earlier, e.g. for boarding), and NEVER after it.
+      - You MUST explicitly schedule a "Flight Landing & Arrival at [Airport name/code]" activity slot in the Day-by-Day schedule, starting at the exact arrival time of that flight.
+      - You MUST explicitly schedule a "Commute & Return to [Airport name/code] for Departure" activity slot in the Day-by-Day schedule, starting exactly 2.5 to 3 hours before the flight departure time.
+    - All other activities on any day with a departure flight (including sightseeing, check-outs, and lunches) MUST be scheduled strictly BEFORE the flight departure time. No activities other than the flight landing itself may ever overlap with or start after a flight's scheduled departure time.
     - For multi-stop route transitions or flight transitions between countries/cities:
       - You MUST strictly generate and link these events sequentially as separate Activities on their respective dates and times:
         1. "Hotel Check-out: [Hotel Name]" (e.g. in Singapore)
         2. "Commute to [Airport Code]" (to travel to the airport in that country)
-        3. "Arrival at Airport, Flight Boarding & Flight Departure (Singapore to Manila)" (explicitly represent the airport flight departure)
-        4. "Flight Landing & Arrival at [Next Airport Code]" (flight landing in the next country/destination)
+        3. "Arrival at Airport, Flight Boarding & Flight Departure" (explicitly represent the airport flight departure starting at the flight departure time)
+        4. "Flight Landing & Arrival at [Next Airport Code]" (flight landing in the next country/destination starting at the flight arrival time)
         5. "Commute from Airport to City / [New Hotel Name]" (airport to city travel)
         6. "Hotel Check-in: [New Hotel Name]" (at the new hotel, stating times clearly)
       Be extremely detailed and specific, stating check-in/out times of every single hotel and commute times to and from airports for every flight transition.
@@ -458,9 +512,10 @@ ${existingItineraryText}
   - You must always structure a day's recommended places strictly based on where the user is checked in for that day! Recommended restaurants and attractions must not be "too far away" from the checked-in hotel for that date (generally within a tight neighborhood cluster of 2-5 km, unless a specific day excursion is explicitly planned).
   - In your daily activities, explicitly state the current active checked-in hotel in the description and details to justify the proximity (e.g., "Conveniently located near your accommodation, [Hotel Name], only a 12-minute walk...").
   - If the user checkouts and moves to a different hotel, you MUST immediately shift the geographic frame of recommendations to be clustered near the *new* hotel and its surrounding area.
+  - MORNING STARTING BASE INTEGRITY: On any morning after checking in to a new hotel, the morning schedule (first activity, breakfast, starting transit, or morning commutes) for subsequent days MUST strictly start from and be based on the newly checked-in hotel base, NOT any previous hotel. Under no circumstances should morning activities or commutes on subsequent days start from or reference a hotel that has already been checked out of.
 - STRICT DESTINATION LOCAL CURRENCY AND PRICING INTEGRITY:
-  - For all ticket prices, budgets, food cost, and transportation costs parameters, you MUST output numbers and symbols in the actual local currency of the specific day's active country/destination (e.g., use '¥' and realistic Japanese Yen numbers for Japan, '₩' and realistic Korean Won numbers for South Korea, 'RM' and realistic Ringgit numbers for Malaysia).
-  - Double check every numeric value to ensure it matches realistic price scales in that local currency (e.g., do NOT generate Taxi RM32,227 for a 22 mins ride! That ride should represent local currency value, e.g. RM25 to RM45, or JPY 3,000 to 5,000, or KRW 15,000 to 25,000 depending on destination). Ensure absolute mathematical realism for each currency.
+  - For all ticket prices, budgets, food cost, and transportation costs parameters, you MUST output numbers accompanied by the official 3-letter currency code of the specific day's active country/destination instead of any currency symbols. Always place the currency code AFTER the number, separated by a space (e.g., use '1500 JPY' instead of '¥1,500' for Japan, '25000 KRW' instead of '₩25,000' for South Korea, '45 MYR' instead of 'RM45' for Malaysia, '30 USD' instead of '$30' for US). Never use symbols like $, €, ¥, £, ₩, ฿, ₹, or RM. Always use the 3-letter currency code.
+  - Double check every numeric value to ensure it matches realistic price scales in that local currency (e.g., do NOT generate Taxi 32227 MYR for a 22 mins ride! That ride should represent local currency value, e.g. 25 - 45 MYR, or 3000 - 5000 JPY, or 15000 - 25000 KRW depending on destination). Ensure absolute mathematical realism for each currency.
 - REFINEMENT & PRESERVATION POLICY:
   - If a CURRENT ACTIVE ITINERARY is provided above, you MUST preserve all existing activity structures, days, dates, IDs, titles, descriptions, and sequence layout. Do NOT shuffle or scramble them.
   - Only insert what is requested (such as "add a museum in Tokyo Day 2") into the correct day list, while returning all other unmodified days and activities exactly identical.
@@ -468,6 +523,7 @@ ${existingItineraryText}
 - Day 1 index must start at 1, ending at dayIndex ${exactDaysCount}. Let Day 1 start appropriately if a flight arrival is specified. Let the last day end in time for airport check-in if there is a departure flight.
 - For each day, include a daily theme (e.g., "Culture & Shrines in Asakusa").
 - For each full day (excluding key travel days limited by actual flights), provide 5 to 6 sequential activities spanning comprehensively from morning to night. It must cover breakfast/morning slot (around 8:00 AM - 10:00 AM), morning exploration (10:00 AM - 12:30 PM), lunch (12:30 PM - 2:00 PM), afternoon adventures/sightseeing (2:00 PM - 5:30 PM), dinner (6:00 PM - 8:00 PM), and an evening/night walking, skyline view, or night market stroll (8:00 PM - 10:00 PM). It must not stop at lunch or early afternoon - the schedule should fully cover morning to night.
+- MANDATORY DIURNAL COVERAGE RULE: For every day in the itinerary (except for the first day and the last day of the trip, which may be constrained by flight arrival/departure times), you MUST generate at least 3 separate activity slots: at least one in the Morning (before 12:00 PM), at least one in the Afternoon (12:00 PM - 6:00 PM), and at least one in the Evening/Night (after 6:00 PM). The schedule must never leave a morning, afternoon, or evening period blank. If no specific major attraction is scheduled, fill the slot with local recommendations (e.g. coffee shop, light walk, park visit, shopping, or dinner).
 - STRICT SPECIFICITY OF PLACES & ESTABLISHMENTS RULE:
   - Never use generic placeholder names like "Evening Dinner", "Night Walk", "Lunch at Local Cafe", "Local Restaurant", "Explore Neighborhood", "Walk in Park", or "Free Time".
   - For all dining slots (breakfast, lunch, dinner, drinks), you MUST name an ACTUAL, real-world, popular highly-rated business/restaurant (e.g., 'Gyukatsu Motomura', 'Afuri Ramen Shinjuku', 'Tapas Molecular Bar', 'Ichiran Sensoji'). Mention specific signature tourist-friendly dishes or food specialities (e.g., 'Wagyu set', 'Yuzu Shio Ramen', 'Teppanyaki') alongside their locations.
@@ -475,8 +531,8 @@ ${existingItineraryText}
 - Every Activity MUST have:
   - Precise timestamp or time slot (e.g., "06:15 PM - 07:30 PM", leaving a clean 15-30 minute travel/commute buffer between the end of the previous activity and the start of this activity).
   - Title, description, and exact named google maps search location.
-  - Opening hours (e.g. "10:00 AM - 10:00 PM") and a realistic local budget range (e.g. "¥1,000 - ¥2,500").
-  - Realistic transportation details from the PREVIOUS activity/hotel to this one, including transport mode (e.g. "Subway (Ginza Line)", "Walk", "Taxi"), transit duration (e.g., "15 mins"), transit cost (e.g., "¥220"), and step-by-step route transit description.
+  - Opening hours (e.g. "10:00 AM - 10:00 PM") and a realistic local budget range (e.g. "1000 - 2500 JPY").
+  - Realistic transportation details from the PREVIOUS activity/hotel to this one, including transport mode (e.g. "Subway (Ginza Line)", "Walk", "Taxi"), transit duration (e.g., "15 mins"), transit cost (e.g., "220 JPY"), and step-by-step route transit description.
 - CRITICAL GEOGRAPHIC DISTANCE & TRANSIT TIMING COHERENCE:
   - You must determine the exact real-world distance between the current activity and the previous activity (or hotel) on the same day. Fill this into the "distance" field of the transportation object (e.g., "1.2 km", "0.4 km", "8.5 km").
   - Make sure venues scheduled on the same day are geographically clustered together so transit times make logical sense. Do not bounce between distant neighborhoods on the same day without allocating realistic transportation times and costs. Leave a 15-30 mins buffer of empty time between consecutive activities to cover actual Google Maps travel time and prevent overlapping conflicts.
@@ -487,7 +543,7 @@ ${existingItineraryText}
 - Return everything strictly in JSON format as requested.
 `;
 
-    // Execute standard Gemini-3.5-flash content generation in JSON mode via retry wrapper
+    // Execute standard Gemini-3.1-flash-lite content generation in JSON mode via retry wrapper
     const response = await generateContentWithRetry({
       model: "gemini-3.1-flash-lite",
       contents: prompt,
@@ -526,15 +582,15 @@ ${existingItineraryText}
                         description: { type: Type.STRING },
                         location: { type: Type.STRING, description: "Name of the place for Google Maps search/embed" },
                         openingHours: { type: Type.STRING },
-                        budgetRange: { type: Type.STRING, description: "e.g. ¥1,500 - ¥3,000" },
-                        ticketPrice: { type: Type.STRING, description: "e.g. ¥1,000" },
-                        foodCost: { type: Type.STRING, description: "e.g. ¥1,500" },
+                        budgetRange: { type: Type.STRING, description: "e.g. 1500 - 3000 JPY" },
+                        ticketPrice: { type: Type.STRING, description: "e.g. 1000 JPY" },
+                        foodCost: { type: Type.STRING, description: "e.g. 1500 JPY" },
                         transportation: {
                           type: Type.OBJECT,
                           properties: {
                             mode: { type: Type.STRING },
                             duration: { type: Type.STRING },
-                            cost: { type: Type.STRING },
+                            cost: { type: Type.STRING, description: "e.g. 220 JPY" },
                             details: { type: Type.STRING },
                             distance: { type: Type.STRING },
                           },
@@ -606,7 +662,26 @@ ${existingItineraryText}
     const resultText = response.text;
     const parsedData = JSON.parse(resultText);
 
-    if (parsedData && parsedData.itinerary) {
+    if (parsedData && parsedData.itinerary && Array.isArray(parsedData.itinerary)) {
+      // Sort itinerary days by dayIndex to ensure they are in order
+      parsedData.itinerary.sort((a: any, b: any) => (a.dayIndex || 0) - (b.dayIndex || 0));
+
+      // Override each day's date to match the precise daysList constructed from start/end dates
+      parsedData.itinerary.forEach((day: any, idx: number) => {
+        day.dayIndex = idx + 1;
+        if (daysList[idx]) {
+          day.date = daysList[idx];
+        }
+      });
+
+      // Make sure parsedData.trip fields are consistent
+      if (!parsedData.trip) {
+        parsedData.trip = {};
+      }
+      parsedData.trip.startDate = startDate;
+      parsedData.trip.endDate = endDate;
+      parsedData.trip.durationDays = daysList.length;
+
       parsedData.itinerary = enforceFlightBoundaries(parsedData.itinerary, flights || []);
       parsedData.itinerary = await adjustItineraryForRealWorldTransit(parsedData.itinerary, flights || []);
     }
@@ -846,51 +921,30 @@ app.post("/api/suggest-airports", async (req, res) => {
     return res.json({ suggestions: [] });
   }
 
-  if (!ai) {
-    const queryUpper = query.trim().toUpperCase();
-    const defaultAirports = [
-      { code: "SIN", name: "Singapore Changi Airport" },
-      { code: "NRT", name: "Tokyo Narita International Airport" },
-      { code: "HND", name: "Tokyo Haneda Airport" },
-      { code: "KUL", name: "Kuala Lumpur International Airport" },
-      { code: "LAX", name: "Los Angeles International Airport" },
-      { code: "JFK", name: "John F. Kennedy International Airport" },
-      { code: "LHR", name: "London Heathrow Airport" },
-      { code: "CDG", name: "Paris Charles de Gaulle Airport" },
-      { code: "DXB", name: "Dubai International Airport" },
-      { code: "SYD", name: "Sydney Kingsford Smith Airport" },
-      { code: "HKG", name: "Hong Kong International Airport" },
-      { code: "ICN", name: "Seoul Incheon International Airport" }
-    ];
-    const filtered = defaultAirports.filter(a => a.code.startsWith(queryUpper) || a.name.toUpperCase().includes(queryUpper));
-    return res.json({ suggestions: filtered.slice(0, 6) });
+  const queryUpper = query.trim().toUpperCase();
+  const suggestions: { code: string; name: string }[] = [];
+
+  for (const c of travelData) {
+    if (c.airports) {
+      for (const a of c.airports) {
+        if (
+          a.iata.toUpperCase().startsWith(queryUpper) ||
+          a.icao.toUpperCase().startsWith(queryUpper) ||
+          a.name.toUpperCase().includes(queryUpper) ||
+          a.city.toUpperCase().includes(queryUpper)
+        ) {
+          suggestions.push({
+            code: a.iata,
+            name: `${a.name} (${a.iata}) - ${a.city || c.country}, ${c.country}`
+          });
+        }
+      }
+    }
   }
 
-  try {
-    const prompt = `
-    Find up to 6 real international airport code suggestions starting with, matching, or related to: "${query}".
-    For each airport, return its 3-letter IATA code and official full airport name.
-    If the query looks like a single letter (e.g. "K"), suggest major global airports starting with that letter (e.g., KUL - Kuala Lumpur, KIX - Kansai, etc.).
-    Return ONLY a JSON array, e.g.:
-    {
-      "suggestions": [
-        { "code": "KUL", "name": "Kuala Lumpur International Airport" },
-        { "code": "KIX", "name": "Kansai International Airport" }
-      ]
-    }
-    Ensure strictly valid JSON matching the format above. No extra text or wrappers.
-    `;
-    const response = await generateContentWithRetry({
-      model: "gemini-3.1-flash-lite",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
-    });
-    const parsed = JSON.parse(response.text);
-    res.json({ suggestions: parsed.suggestions || [] });
-  } catch (err) {
-    console.error("suggest-airports error:", err);
-    res.json({ suggestions: [] });
-  }
+  // Deduplicate by code and limit to 10
+  const unique = Array.from(new Map(suggestions.map(s => [s.code, s])).values());
+  return res.json({ suggestions: unique.slice(0, 10) });
 });
 
 // Autocomplete attractions, landmarks, cafes, spots for Want To Go wishlist
@@ -977,7 +1031,7 @@ app.post("/api/suggest-alternatives", async (req, res) => {
           location: currentActivity.location || "City Center",
           type: "sightseeing",
           openingHours: "09:00 AM - 05:00 PM",
-          budgetRange: "Free - ¥1,000",
+          budgetRange: "Free - 1000 JPY",
           label: "AI suggested",
           transportation: {
             mode: "Walk",
@@ -1024,7 +1078,7 @@ app.post("/api/suggest-alternatives", async (req, res) => {
           "location": "Detailed address or searchable place name",
           "type": "sightseeing" or "food" or "leisure" or "culture",
           "openingHours": "e.g. 09:00 AM - 06:00 PM",
-          "budgetRange": "e.g. ¥1,500" or "Free",
+          "budgetRange": "e.g. 1500 JPY" or "Free",
           "transportation": {
             "mode": "e.g. Walk",
             "duration": "e.g. 5 mins",
@@ -1082,7 +1136,7 @@ app.post("/api/validate-itinerary", async (req, res) => {
         if (ampm === "am" && hours === 12) hours = 0;
         return hours * 60 + minutes;
       }
-    } catch (_) {}
+    } catch (_) { }
     return 0;
   };
 
@@ -1106,10 +1160,10 @@ app.post("/api/validate-itinerary", async (req, res) => {
 
     // Skip feasibility warning if previous activity was a flight/airport arrival,
     // as that indicates an inter-city transition and they did not commute on ground
-    const isFlightA = actA.type === "airport" || 
-                      (actA.title || "").toLowerCase().includes("flight") || 
-                      (actA.location || "").toLowerCase().includes("airport") ||
-                      (actA.description || "").toLowerCase().includes("flight");
+    const isFlightA = actA.type === "airport" ||
+      (actA.title || "").toLowerCase().includes("flight") ||
+      (actA.location || "").toLowerCase().includes("airport") ||
+      (actA.description || "").toLowerCase().includes("flight");
     if (isFlightA) continue;
 
     const timesA = parseActivityTimes(actA.time);
@@ -1118,7 +1172,7 @@ app.post("/api/validate-itinerary", async (req, res) => {
     if (timesA.start === 0 || timesB.start === 0) continue;
 
     const gapMinutes = timesB.start - timesA.end;
-    
+
     // Check key transport preferences for this specific transition (from the current activity box)
     const mode = actB.preferredTransportMode === "driving" ? "driving" : actB.preferredTransportMode === "walking" ? "walking" : "transit";
 
@@ -1260,9 +1314,9 @@ app.post("/api/validate-itinerary", async (req, res) => {
     const locB = pair.actB.location.toLowerCase();
 
     const isTokyoFuji = (locA.includes("tokyo") && (locB.includes("fuji") || locB.includes("hakone"))) ||
-                        ((locA.includes("fuji") || locA.includes("hakone")) && locB.includes("tokyo"));
+      ((locA.includes("fuji") || locA.includes("hakone")) && locB.includes("tokyo"));
     const isTokyoKyoto = (locA.includes("tokyo") && locB.includes("kyoto")) ||
-                         (locA.includes("kyoto") && locB.includes("tokyo"));
+      (locA.includes("kyoto") && locB.includes("tokyo"));
 
     if (isTokyoFuji && pair.gapMinutes < 90) {
       const isImpossible = pair.gapMinutes < 60;
@@ -1365,7 +1419,7 @@ app.post("/api/get-transit-info", async (req, res) => {
       - "mode": short string specifying exact travel medium (e.g. "Subway (Yamanote)", "Shinkansen Train", "Taxi", "Uber/Ride-hail", "Walk/Foot", "Scenic Walk")
       - "duration": accurate transit travel time (e.g. "12 mins", "45 mins", "140 mins", "15 mins")
       - "distance": travel distance (e.g. "3.5 km", "102 km", "0.8 km")
-      - "cost": estimated local cost in equivalent local currency if possible, or relative range (e.g. "¥1,800", "¥220", "$15.00", "$2.50", "Free")
+      - "cost": estimated local cost in equivalent local currency followed by the official 3-letter currency code, or relative range (e.g. "1800 JPY", "220 JPY", "15 USD", "2.50 USD", "Free"). Never use symbols like $, €, ¥, £.
       - "details": concise single-sentence transit guidelines (e.g. "Take Tobu line from Asakusa station, then walk 4 mins")
 
       Keep the JSON strictly conformant, no markup or markdown wrapper, no backticks, just valid JSON output:
@@ -1403,22 +1457,22 @@ app.post("/api/get-transit-info", async (req, res) => {
   const locA = origin.toLowerCase();
   const locB = destination.toLowerCase();
   const isTokyoFuji = (locA.includes("tokyo") && (locB.includes("fuji") || locB.includes("hakone"))) ||
-                      ((locA.includes("fuji") || locA.includes("hakone")) && locB.includes("tokyo"));
+    ((locA.includes("fuji") || locA.includes("hakone")) && locB.includes("tokyo"));
   const isTokyoKyoto = (locA.includes("tokyo") && locB.includes("kyoto")) ||
-                       (locA.includes("kyoto") && locB.includes("tokyo"));
+    (locA.includes("kyoto") && locB.includes("tokyo"));
 
   if (isTokyoFuji) {
     if (transportMode === "transit") {
       result.mode = "Exp. Railway / Bus";
       result.duration = "135 mins";
       result.distance = "105 km";
-      result.cost = "¥2,500";
+      result.cost = "2500 JPY";
       result.details = "Odakyu romancecar from Shinjuku or express bus from Tokyo highway station";
     } else {
       result.mode = "Taxi / Rent-car";
       result.duration = "95 mins";
       result.distance = "102 km";
-      result.cost = "¥28,000";
+      result.cost = "28000 JPY";
       result.details = "Chuo Expressway driving (tolls apply)";
     }
   } else if (isTokyoKyoto) {
@@ -1426,13 +1480,13 @@ app.post("/api/get-transit-info", async (req, res) => {
       result.mode = "Shinkansen Train";
       result.duration = "135 mins";
       result.distance = "450 km";
-      result.cost = "¥14,000";
+      result.cost = "14000 JPY";
       result.details = "Tokaido Shinkansen (Nozomi) express train from Tokyo Station";
     } else {
       result.mode = "Driving via highway";
       result.duration = "330 mins";
       result.distance = "450 km";
-      result.cost = "¥18,000";
+      result.cost = "18000 JPY";
       result.details = "Tomei Expressway (approx 5.5 hours driving, toll road)";
     }
   }
@@ -1443,14 +1497,14 @@ app.post("/api/get-transit-info", async (req, res) => {
 // Real-time recalculation of commute details and chronological alignment for modified day activities
 app.post("/api/recalculate-transit-for-day", async (req, res) => {
   const { activities, flights } = req.body;
-  
+
   if (!activities || !Array.isArray(activities)) {
     return res.status(400).json({ error: "Activities array is required" });
   }
 
   try {
     const adjustedDayList = await adjustItineraryForRealWorldTransit(
-      [{ activities }], 
+      [{ activities }],
       flights || []
     );
     res.json({ activities: adjustedDayList[0].activities });
@@ -1463,7 +1517,7 @@ app.post("/api/recalculate-transit-for-day", async (req, res) => {
 // Route and Time slot Optimizer for Day Schedule (Travel Salesperson sequence and non-conflicting times auto-recalculation)
 app.post("/api/optimize-schedule", async (req, res) => {
   const { activities, hotel, startLocation } = req.body;
-  
+
   if (!activities || !Array.isArray(activities) || activities.length === 0) {
     return res.status(400).json({ error: "Activities array is required" });
   }
